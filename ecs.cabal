@@ -1,0 +1,56 @@
+cabal-version:      2.4
+name:               ecs
+version:            0.1.0.0
+
+-- A short (one-line) description of the package.
+-- synopsis:
+
+-- A longer description of the package.
+-- description:
+
+-- A URL where users can report bugs.
+-- bug-reports:
+
+-- The license under which the package is released.
+-- license:
+author:             Simre1
+maintainer:         simre4775@gmail.com
+
+-- A copyright notice.
+-- copyright:
+-- category:
+extra-source-files: CHANGELOG.md
+
+library
+    build-depends:    base >4.13.0.0, vector, hashtables, transformers, unboxing-vector, unliftio
+    hs-source-dirs:   src
+    exposed-modules:
+        Data.SparseSet.Unboxed,
+        Data.SparseSet.NoComponent,
+        Hex.Internal.World,
+        Hex.Internal.Component,
+        Hex.Internal.Entity,
+        Hex.Internal.System,
+        Hex.Internal.Component.UnboxedSet
+
+    default-language: GHC2021
+    default-extensions:
+        DataKinds
+        TypeFamilies
+    ghc-options: -O2
+
+test-suite ecs
+    type: exitcode-stdio-1.0
+    main-is: Main.hs
+    build-depends:    base >4.13.0.0, ecs, tasty, tasty-hunit
+    hs-source-dirs:   test
+    default-language: GHC2021
+
+executable bench
+    main-is: Main.hs
+    build-depends:    base >4.13.0.0, ecs, tasty, tasty-bench, apecs, transformers
+    hs-source-dirs:   bench
+    default-language: GHC2021
+    ghc-options: -O2
+
+
