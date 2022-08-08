@@ -13,22 +13,20 @@ import qualified Data.SparseSet.Storable as SV
 unboxedSet :: Unboxable component => MaxEntities -> IO (Store component)
 unboxedSet (MaxEntities entities) = do
   set <- SU.create entities (entities `quot` 3)
-  pure $ Store $ UnboxableStore set
+  pure $ Store set
 
-newtype UnboxableStore a = UnboxableStore (SU.SparseSetUnboxed a) 
-
-instance Unboxable a => StoreClass UnboxableStore a where
-  storeClassContains (UnboxableStore set) entity = SU.contains set (coerce entity)
-  storeClassGet (UnboxableStore set) entity = SU.unsafeLookup set (coerce entity)
-  storeClassPut (UnboxableStore set) entity val = SU.insert set (coerce entity) val
-  storeClassDelete (UnboxableStore set) entity = SU.remove set (coerce entity)
-  storeClassFor (UnboxableStore set) f = SU.for set (coerce f)
-  storeClassMembers (UnboxableStore set) = SU.size set
+instance Unboxable a => StoreClass SU.SparseSetUnboxed a where
+  storeClassContains set entity = SU.contains set (coerce entity)
+  storeClassGet set entity = SU.unsafeLookup set (coerce entity)
+  storeClassPut set entity val = SU.insert set (coerce entity) val
+  storeClassDelete set entity = SU.remove set (coerce entity)
+  storeClassFor set f = SU.for set (coerce f)
+  storeClassMembers set = SU.size set
 
 storedSet :: Storable component => MaxEntities -> IO (Store component)
 storedSet (MaxEntities entities) = do
   set <- SV.create entities (entities `quot` 3)
-  pure $ Store $ set
+  pure $ Store set
 
 instance Storable a => StoreClass SV.SparseSetStorable a where
   storeClassContains set entity = SV.contains set (coerce entity)

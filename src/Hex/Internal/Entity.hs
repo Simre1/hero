@@ -31,14 +31,14 @@ newEntity (MaxEntities max) (Entities entities lastIdRef) = do
       if contained
         then findNext last ((distance + 1)^2)
         else pure next
-{-# Inline newEntity #-}
+{-# INLINE newEntity #-}
 
 
 removeEntity :: Entities -> Entity -> IO ()
 removeEntity (Entities entities _) (Entity key) = S.remove entities key 
-{-# Inline removeEntity #-}
+{-# INLINE removeEntity #-}
 
 
 forEntities :: Entities -> (Entity -> IO ()) -> IO ()
 forEntities (Entities entities _) f = S.for entities (coerce f)
-{-# Inline forEntities #-}
+{-# INLINE forEntities #-}

@@ -57,7 +57,7 @@ executable bench
 
 executable profile
     main-is: Main.hs
-    build-depends:    base >4.13.0.0, ecs
+    build-depends:    base >4.13.0.0, ecs, derive-storable, derive-storable-plugin
     hs-source-dirs:   profile
     default-language: GHC2021
     ghc-options: -O2

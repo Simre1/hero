@@ -39,8 +39,8 @@ addStorage (Stores mapRef) store =
       (someTypeRep (Proxy @component))
       (WrappedStorage $ unsafeCoerce store)
 
-addComponentStorage :: forall component. (Component component, Typeable component) => Stores -> MaxEntities -> Proxy component -> IO ()
-addComponentStorage stores@(Stores mapRef) max _ = do
+addComponentStorage :: forall component. (Component component) => Stores -> MaxEntities -> IO ()
+addComponentStorage stores@(Stores mapRef) max = do
   store <- componentStorage @component max
   addStorage stores store
 

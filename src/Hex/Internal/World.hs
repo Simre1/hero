@@ -1,6 +1,6 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 module Hex.Internal.World where
 
-import Data.Data (Proxy)
 import Data.Word (Word32)
 import Hex.Internal.Component
 import Hex.Internal.Entity
@@ -22,8 +22,8 @@ worldComponentStorage :: Component component => World -> IO (Store component)
 worldComponentStorage !w = getComponentStorage (worldStores w) (worldMaxEntities w)
 {-# INLINE worldComponentStorage #-}
 
-worldAddComponentStorage :: Component component => World -> Proxy component -> IO ()
-worldAddComponentStorage !w = addComponentStorage (worldStores w) (worldMaxEntities w)
+worldAddComponentStorage :: forall component. Component component => World -> IO ()
+worldAddComponentStorage !w = addComponentStorage @component (worldStores w) (worldMaxEntities w)
 {-# INLINE worldAddComponentStorage #-}
 
 worldNewEntity :: World -> IO Entity

@@ -9,7 +9,6 @@ import Apecs (Has, Storage, SystemT (..), asks, explInit)
 import Apecs qualified as A
 import Control.Monad
 import Control.Monad.IO.Class
-import Data.Proxy
 import Hex.Internal.Component
 import Hex.Internal.Component.SparseSet
 import Hex.Internal.Entity (Entity (..), MaxEntities (MaxEntities))
@@ -58,9 +57,9 @@ main = do
 makeWorld :: IO World
 makeWorld = do
   world <- newWorld 10000
-  worldAddComponentStorage world $ Proxy @Position
-  worldAddComponentStorage world $ Proxy @Velocity
-  worldAddComponentStorage world $ Proxy @Acceleration
+  worldAddComponentStorage @Position world 
+  worldAddComponentStorage @Velocity world 
+  worldAddComponentStorage @Acceleration world 
 
   runSystem world $ do
     forM_ [0 .. 2000] $ \i -> do

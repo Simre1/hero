@@ -6,7 +6,6 @@ module Hex.Internal.Query where
 import Control.Monad (when)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
-import Data.Data (Proxy (..))
 import Data.IORef
 import Hex.Internal.Component
 import Hex.Internal.Entity
@@ -33,7 +32,6 @@ qAsk = QueryBody $ ask
 worldQuery_ :: forall components m a. (MonadIO m, MPS components) => World -> (components -> QueryBody ()) -> m ()
 worldQuery_ w f = liftIO $
   multiFor @(S components) @components w $ \e comps -> do
-    -- comps <- multiGet @(S components) w e
     runReaderT (runQueryBody (f comps)) (w, e)
 {-# INLINE worldQuery_ #-}
 
@@ -41,7 +39,6 @@ worldQuery :: forall components m a. (Monoid a, MonadIO m, MPS components) => Wo
 worldQuery w f = liftIO $ do
   ref <- newIORef mempty
   multiFor @(S components) @components w $ \e comps -> do
-    -- comps <- multiGet @(S components) w e
     a <- runReaderT (runQueryBody (f comps)) (w, e)
     modifyIORef' ref (<> a)
   readIORef ref
@@ -115,13 +112,11 @@ instance (MPS a, MPS b) => MultiComponent False (a, b) where
     amountB <- multiMembers @(S b) @b w
     if amountA > amountB
       then multiFor @(S b) @b w $ \e bs -> do
-        contained <- multiContains @(S a) @a w e
-        when contained $ do
+        whenIO (multiContains @(S a) @a w e) $ do
           as <- multiGet @(S a) @a w e
           f e (as, bs)
       else multiFor @(S a) @a w $ \e as -> do
-        contained <- multiContains @(S a) @a w e
-        when contained $ do
+        whenIO (multiContains @(S a) @a w e) $ do
           bs <- multiGet @(S b) @b w e
           f e (as, bs)
   multiMembers w = min <$> multiMembers @(S a) @a w <*> multiMembers @(S b) @b w
@@ -145,39 +140,39 @@ instance (MPS a, MPS b, MPS c) => MultiComponent False (a, b, c) where
       then
         if amountB > amountC
           then multiFor @(S c) @c w $ \e cs -> do
-            containedA <- multiContains @(S a) @a w e
-            containedB <- multiContains @(S b) @b w e
-            when (containedA && containedB) $ do
-              as <- multiGet @(S a) @a w e
-              bs <- multiGet @(S b) @b w e
-              f e (as, bs, cs)
-          else multiFor @(S b) @b w $ \e bs ->  do
-            containedA <- multiContains @(S a) @a w e
-            containedC <- multiContains @(S c) @c w e
-            when (containedA && containedC) $ do
-              as <- multiGet @(S a) @a w e
-              cs <- multiGet @(S c) @c w e
-              f e (as, bs, cs)
+            whenIO (multiContains @(S a) @a w e) $
+              whenIO (multiContains @(S b) @b w e) $ do
+                as <- multiGet @(S a) @a w e
+                bs <- multiGet @(S b) @b w e
+                f e (as, bs, cs)
+          else multiFor @(S b) @b w $ \e bs -> do
+            whenIO (multiContains @(S a) @a w e) $
+              whenIO (multiContains @(S c) @c w e) $ do
+                as <- multiGet @(S a) @a w e
+                cs <- multiGet @(S c) @c w e
+                f e (as, bs, cs)
       else
         if amountA > amountC
           then multiFor @(S c) @c w $ \e cs -> do
-            containedA <- multiContains @(S a) @a w e
-            containedB <- multiContains @(S b) @b w e
-            when (containedA && containedB) $ do
-              as <- multiGet @(S a) @a w e
-              bs <- multiGet @(S b) @b w e
-              f e (as, bs, cs)
+            whenIO (multiContains @(S a) @a w e) $
+              whenIO (multiContains @(S b) @b w e) $ do
+                as <- multiGet @(S a) @a w e
+                bs <- multiGet @(S b) @b w e
+                f e (as, bs, cs)
           else multiFor @(S a) @a w $ \e as -> do
-            containedB <- multiContains @(S b) @b w e
-            containedC <- multiContains @(S c) @c w e
-            when (containedB && containedB) $ do
-              cs <- multiGet @(S c) @c w e
-              bs <- multiGet @(S b) @b w e
-              f e (as, bs, cs)
+            whenIO (multiContains @(S b) @b w e) $
+              whenIO (multiContains @(S c) @c w e) $ do
+                cs <- multiGet @(S c) @c w e
+                bs <- multiGet @(S b) @b w e
+                f e (as, bs, cs)
   multiMembers w = min <$> (min <$> multiMembers @(S a) @a w <*> multiMembers @(S b) @b w) <*> multiMembers @(S c) @c w
   {-# INLINE multiContains #-}
   {-# INLINE multiGet #-}
   {-# INLINE multiPut #-}
   {-# INLINE multiDelete #-}
-  {-# INLINE multiFor #-}
   {-# INLINE multiMembers #-}
+
+whenIO :: IO Bool -> IO () -> IO ()
+whenIO action f = do
+  b <- action
+  when b f

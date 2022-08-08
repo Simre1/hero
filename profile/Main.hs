@@ -1,45 +1,58 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -fplugin=Foreign.Storable.Generic.Plugin #-}
 
 module Main where
 
 import Control.Monad
 import Control.Monad.IO.Class
-import Data.Proxy
 import Hex.Internal.Component
 import Hex.Internal.Component.SparseSet
 import Hex.Internal.Entity (Entity (..), MaxEntities (MaxEntities))
 import Hex.Internal.System
 import Hex.Internal.World
+import GHC.Generics (Generic)
+import Foreign.Storable.Generic (GStorable)
 
-newtype Position = Position (Int, Int) deriving (Unboxable)
+data Position = Position Int Int deriving (Generic)
+
+instance GStorable Position
 
 instance Component Position where
-  componentStorage = unboxedSet
+  componentStorage = storedSet
 
-newtype Velocity = Velocity (Int, Int) deriving (Unboxable)
+data Velocity = Velocity Int Int deriving (Generic)
+
+instance GStorable Velocity
 
 instance Component Velocity where
-  componentStorage = unboxedSet
+  componentStorage = storedSet
+
+data Acceleration = Acceleration Int Int deriving (Generic)
+
+instance GStorable Acceleration
+
+instance Component Acceleration where
+  componentStorage = storedSet
+
 
 main :: IO ()
 main = do
   !world <- makeWorld
-  runSystem world testHex2
-
+  runSystem world physics
+  
 makeWorld :: IO World
 makeWorld = do
   world <- newWorld 10000
-  worldAddComponentStorage world $ Proxy @Position
-  worldAddComponentStorage world $ Proxy @Velocity
-
-  runSystem world $ do
-    forM_ [0 .. 1000] $ \i -> do
-      newEntity (Position (i, 0), Velocity (2, 1))
+  worldAddComponentStorage @Position world
+  worldAddComponentStorage @Velocity world
+  worldAddComponentStorage @Acceleration world
   pure world
 
-testHex2 :: System IO ()
-testHex2 = do
-  forM_ [0 .. 1500] $ \_ -> do
-    cMap $ \(Position (x, y), Velocity (vx, vy)) -> Position (x + vx, y + vy)
+physics :: System IO ()
+physics = do
+  forM_ [0 .. 1000] $ \_ -> do
+    cMap $ \(Velocity vx vy, Acceleration ax ay) -> Velocity (vx + ax) (vy + ay)
+    cMap $ \(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy)
+    cFoldl (\s (Position x y) -> s + x + y) (0 :: Int)
+  pure ()
