@@ -21,42 +21,76 @@ newtype Position = Position (Int, Int) deriving (Unboxable)
 instance Component Position where
   componentStorage = unboxedSet
 
-newtype Speed = Speed (Int, Int) deriving (Unboxable)
+newtype Velocity = Velocity (Int, Int) deriving (Unboxable)
 
-instance Component Speed where
+instance Component Velocity where
   componentStorage = unboxedSet
 
-A.makeWorldAndComponents "ApecsWorld" [''Position, ''Speed]
+A.makeWorldAndComponents "ApecsWorld" [''Position, ''Velocity]
 
 main :: IO ()
 main = do
+  !world <- makeWorld
+  apecsWorld <- makeApecsWorld
+  -- runSystem world testHex2
+  -- pure ()
+
   defaultMain
-    [ bench "apecs" $ nfIO $ testApecs,
-      bench "hex" $ nfIO $ testHex
+    [ bench "hex" $ nfIO $ runSystem world testHex2,  
+      bench "apecs" $ nfIO $ A.runSystem testApecs2 apecsWorld
+      
     ]
 
-testHex :: IO ()
-testHex = do
+-- testHex :: IO ()
+-- testHex = do
+--   world <- newWorld 10000
+--   worldAddComponentStorage world $ Proxy @Position
+--   worldAddComponentStorage world $ Proxy @Velocity
+
+--   runSystem world $ do
+--     forM_ [0 .. 4000] $ \i -> do
+--       newEntity (Position (i, 0), Velocity (2, 1))
+
+--     forM_ [0 .. 500] $ \_ -> do
+--       cMap $ \(Position (x, y), Velocity (vx, vy)) -> Position (x + vx, y + vy)
+
+-- testApecs :: IO ()
+-- testApecs = do
+--   apecsWorld <- initApecsWorld
+
+--   flip A.runSystem apecsWorld $ do
+--     forM_ [0 .. 4000] $ \i -> do
+--       A.newEntity (Position (i, 0), Velocity (2, 1))
+--     forM_ [0 .. 500] $ \_ -> do
+--       A.cmap $ \(Position (x, y), Velocity (vx, vy)) -> Position (x + vx, y + vy)
+
+makeWorld :: IO World
+makeWorld = do
   world <- newWorld 10000
   worldAddComponentStorage world $ Proxy @Position
-  worldAddComponentStorage world $ Proxy @Speed
+  worldAddComponentStorage world $ Proxy @Velocity
 
   runSystem world $ do
-    forM_ [0 .. 0] $ \i -> do
-      e <- newEntity
-      putEntity e (Position (i, 0))
+    forM_ [0 .. 1000] $ \i -> do
+      newEntity (Position (i, 0), Velocity (2, 1))
+  pure world
 
-    forM_ [0 .. 1000] $ \_ -> do
-      cmap $ \(Position (i, x)) -> Position (i, succ x)
-
-testApecs :: IO ()
-testApecs = do
-
+makeApecsWorld :: IO ApecsWorld
+makeApecsWorld = do
   apecsWorld <- initApecsWorld
 
   flip A.runSystem apecsWorld $ do
-    forM_ [0 .. 2000] $ \i -> do
-      e <- A.newEntity (Position (i, 0))
-      pure ()    
-    forM_ [0 .. 1000] $ \_ -> do
-      A.cmap $ \(Position (i, x)) -> Position (i, succ x)
+    forM_ [0 .. 1000] $ \i -> do
+      e <- A.newEntity (Position (i, 0), Velocity (2, 1))
+      pure ()
+  pure apecsWorld
+
+testHex2 :: System IO ()
+testHex2 = do
+  forM_ [0 .. 1500] $ \_ -> do
+    cMap $ \(Position (x, y), Velocity (vx, vy)) -> Position (x + vx, y + vy)
+
+testApecs2 :: A.System ApecsWorld ()
+testApecs2 = do
+  forM_ [0 .. 1500] $ \_ -> do
+    A.cmap $ \(Position (x, y), Velocity (vx, vy)) -> Position (x + vx, y + vy)

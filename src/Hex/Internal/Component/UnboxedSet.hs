@@ -10,8 +10,7 @@ import Hex.Internal.Entity
 
 unboxedSet :: Unboxable component => MaxEntities -> IO (Store component)
 unboxedSet (MaxEntities entities) = do
-  set <- SU.create entities (entities `quot` 3)
-
+  !set <- SU.create entities (entities `quot` 3)
   pure $
     Store
       { storeContains = storeContains' set,
@@ -38,8 +37,8 @@ storeDelete' :: Unboxable a => SU.SparseSetUnboxed a -> Entity -> IO ()
 storeDelete' !set !entity = SU.remove set (coerce entity)
 {-# INLINE storeDelete' #-}
 
-storeFor' :: (MonadIO m, Unboxable a) => SU.SparseSetUnboxed a -> (m () -> IO ()) -> (Entity -> a -> m ()) -> IO ()
-storeFor' !set !unlift !f = unlift $ SU.for set (coerce f)
+storeFor' :: (Unboxable a) => SU.SparseSetUnboxed a -> (Entity -> IO ()) -> IO ()
+storeFor' !set !f = SU.for set (coerce f)
 {-# INLINE storeFor' #-}
 
 storeMembers' :: SU.SparseSetUnboxed a -> IO Int

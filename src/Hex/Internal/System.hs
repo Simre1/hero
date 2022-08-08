@@ -1,53 +1,72 @@
 module Hex.Internal.System where
 
-import Hex.Internal.World
-import Control.Monad.Trans.Reader
 import Control.Monad.IO.Class
-import Hex.Internal.Entity
-import Hex.Internal.Component
 import Control.Monad.Trans.Class
+import Control.Monad.Trans.Reader
+import Hex.Internal.Component
+import Hex.Internal.Entity
+import Hex.Internal.Query
+import Hex.Internal.World
 import UnliftIO
 
 newtype System m a = System (ReaderT World m a) deriving (Functor, Applicative, Monad, MonadIO, MonadTrans)
 
 askWorld :: Monad m => System m World
 askWorld = System ask
-{-# Inline askWorld #-}
+{-# INLINE askWorld #-}
 
-
-askStore :: forall component m.  (MonadIO m, Component component) => Monad m => System m (Store component)
+askStore :: forall component m. (MonadIO m, Component component) => Monad m => System m (Store component)
 askStore = askWorld >>= liftIO . worldComponentStorage @component
-{-# Inline askStore #-}
+{-# INLINE askStore #-}
 
-cmap :: (Component a, Component b, MonadIO m) => (a -> b) -> System m ()
-cmap f = do
-  aStore <- askStore
-  bStore <- askStore
-  liftIO $ storeFor aStore id $ \e a -> 
-    storePut bStore e $ f a 
-{-# Inline cmap #-}
+query :: (Monoid a, MonadIO m, MPS components) => (components -> QueryBody a) -> System m a
+query f = askWorld >>= lift . flip worldQuery f
+{-# INLINE query #-}
 
-cmapM :: (MonadIO m, Component a, Component b, MonadIO m, MonadUnliftIO m) => (a -> m b) -> System m ()
-cmapM f = do
-  aStore <- askStore
-  bStore <- askStore
-  lift $ withRunInIO $ \unlift -> storeFor aStore unlift $ \e a -> do
-    b <- f a
-    liftIO $ storePut bStore e b  
-{-# Inline cmapM #-}
+query_ :: (MonadIO m, MPS components) => (components -> QueryBody ()) -> System m ()
+query_ f = askWorld >>= lift . flip worldQuery_ f
+{-# INLINE query_ #-}
+
+cMap :: (MPS a, MPS b, MonadIO m) => (a -> b) -> System m ()
+cMap f = query_ $ \a -> qPut (f a)
+{-# INLINE cMap #-}
+
+cMapM :: (MPS a, MPS b, MonadIO m, MonadUnliftIO m) => (a -> m b) -> System m ()
+cMapM f = do
+  w <- askWorld
+  lift $
+    withRunInIO $ \unlift -> worldQuery_ w $ \a -> do
+      b <- liftIO $ unlift $ f a
+      qPut b
+{-# INLINE cMapM #-}
+
+cFold :: (Monoid r, MPS a, MonadIO m) => (a -> r) -> System m r
+cFold f = query $ \a -> pure $ f a 
+
+cFoldM :: (Monoid r, MPS a, MonadIO m, MonadUnliftIO m) => (a -> m r) -> System m r
+cFoldM f = do
+  w <- askWorld
+  lift $ withRunInIO $ \unlift -> worldQuery w $ \a -> liftIO $ unlift (f a) 
+
+newEntity' :: MonadIO m => System m Entity
+newEntity' = askWorld >>= liftIO . worldNewEntity
+{-# INLINE newEntity' #-}
 
 
-newEntity :: MonadIO m => System m Entity
-newEntity = askWorld >>= liftIO . worldNewEntity  
-{-# Inline newEntity #-}
+newEntity :: (MPS a, MonadIO m) => a -> System m Entity
+newEntity a = do
+  e <- newEntity' 
+  putEntity e a
+  pure e
+{-# INLINE newEntity #-}
 
 
-putEntity :: Component a => MonadIO m => Entity -> a -> System m ()
+putEntity :: forall a m. (MonadIO m, MPS a) => Entity -> a -> System m ()
 putEntity entity a = do
-  aStore <- askStore
-  liftIO $ storePut aStore entity a
-{-# Inline putEntity #-}
+  w <- askWorld
+  liftIO $ multiPut @(S a) w entity a
+{-# INLINE putEntity #-}
 
 runSystem :: World -> System m a -> m a
 runSystem w (System r) = runReaderT r w
-{-# Inline runSystem #-}
+{-# INLINE runSystem #-}

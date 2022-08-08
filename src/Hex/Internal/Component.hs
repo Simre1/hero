@@ -1,11 +1,13 @@
 module Hex.Internal.Component where
 
-import Data.HashTable.IO as H
+-- import Data.HashTable.IO as H
+import qualified Data.Map.Strict as M
 import Data.Proxy
 import Hex.Internal.Entity
 import Type.Reflection
 import Unsafe.Coerce
 import Control.Monad.IO.Class
+import Data.IORef
 
 class Typeable component => Component component where
   componentStorage :: MaxEntities -> IO (Store component)
@@ -17,35 +19,35 @@ data Store component = Store
     storeGet :: Entity -> IO component,
     storePut :: Entity -> component -> IO (),
     storeDelete :: Entity -> IO (),
-    storeFor :: forall m. MonadIO m => (m () -> IO ()) -> (Entity -> component -> m ()) -> IO (),
+    storeFor :: (Entity -> IO ()) -> IO (),
     storeMembers :: IO Int
   }
 
-newtype Stores = Stores (H.BasicHashTable SomeTypeRep WrappedStorage)
+-- newtype Stores = Stores (H.BasicHashTable SomeTypeRep WrappedStorage)
+
+newtype Stores = Stores (IORef (M.Map SomeTypeRep WrappedStorage))
 
 addStorage :: forall component. Typeable component => Stores -> Store component -> IO ()
-addStorage (Stores table) store =
-  H.insert
-    table
-    (someTypeRep (Proxy @component))
-    (WrappedStorage $ unsafeCoerce store)
+addStorage (Stores mapRef) store =
+  modifyIORef' mapRef $ M.insert
+      (someTypeRep (Proxy @component))
+      (WrappedStorage $ unsafeCoerce store)
 
 addComponentStorage :: forall component. (Component component, Typeable component) => Stores -> MaxEntities -> Proxy component -> IO ()
-addComponentStorage (Stores table) max _ = do
+addComponentStorage (Stores mapRef) max _ = do
   store <- componentStorage @component max
-  H.insert
-    table
-    (someTypeRep (Proxy @component))
-    (WrappedStorage $ unsafeCoerce store)
+  modifyIORef' mapRef $ M.insert
+      (someTypeRep (Proxy @component))
+      (WrappedStorage $ unsafeCoerce store)
 
 getStorage :: forall component. Typeable component => Stores -> IO (Maybe (Store component))
-getStorage (Stores table) =
-  unsafeCoerce $
-    H.lookup table (someTypeRep (Proxy @component))
+getStorage (Stores mapRef) =
+  unsafeCoerce $ M.lookup (someTypeRep (Proxy @component)) <$> readIORef mapRef
 
 getComponentStorage :: forall component. (Typeable component, Component component) => Stores -> MaxEntities -> IO (Store component)
-getComponentStorage stores@(Stores table) max = do
-  maybeStorage <- H.lookup table (someTypeRep (Proxy @component))
+getComponentStorage stores@(Stores mapRef) max = do
+  map <- readIORef mapRef
+  let maybeStorage = M.lookup (someTypeRep (Proxy @component)) map
   case maybeStorage of
     Just store -> pure $ unsafeCoerce store
     Nothing -> do
@@ -54,4 +56,4 @@ getComponentStorage stores@(Stores table) max = do
       pure store
 
 newStores :: IO Stores
-newStores = Stores <$> H.new
+newStores = Stores <$> newIORef M.empty

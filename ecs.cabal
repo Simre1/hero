@@ -22,7 +22,7 @@ maintainer:         simre4775@gmail.com
 extra-source-files: CHANGELOG.md
 
 library
-    build-depends:    base >4.13.0.0, vector, hashtables, transformers, unboxing-vector, unliftio
+    build-depends:    base >4.13.0.0, vector, hashtables, transformers, unboxing-vector, unliftio, containers
     hs-source-dirs:   src
     exposed-modules:
         Data.SparseSet.Unboxed,
@@ -31,12 +31,14 @@ library
         Hex.Internal.Component,
         Hex.Internal.Entity,
         Hex.Internal.System,
+        Hex.Internal.Query,
         Hex.Internal.Component.UnboxedSet
 
     default-language: GHC2021
     default-extensions:
         DataKinds
         TypeFamilies
+        Strict
     ghc-options: -O2
 
 test-suite ecs
@@ -53,4 +55,10 @@ executable bench
     default-language: GHC2021
     ghc-options: -O2
 
+executable profile
+    main-is: Main.hs
+    build-depends:    base >4.13.0.0, ecs
+    hs-source-dirs:   profile
+    default-language: GHC2021
+    ghc-options: -O2
 
