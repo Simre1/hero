@@ -10,16 +10,28 @@ import Hex.Internal.Entity
 
 unboxedSet :: Unboxable component => MaxEntities -> IO (Store component)
 unboxedSet (MaxEntities entities) = do
-  !set <- SU.create entities (entities `quot` 3)
-  pure $
-    Store
-      { storeContains = storeContains' set,
-        storeGet = storeGet' set,
-        storePut = storePut' set,
-        storeDelete = storeDelete' set,
-        storeFor = storeFor' set,
-        storeMembers = storeMembers' set
-      }
+  set <- SU.create entities (entities `quot` 3)
+  pure $ Store $ UnboxableStore set
+
+
+newtype UnboxableStore a = UnboxableStore (SU.SparseSetUnboxed a) 
+
+instance Unboxable a => StoreClass UnboxableStore a where
+  storeClassContains (UnboxableStore set) = storeContains' set
+  storeClassGet (UnboxableStore set) = storeGet' set
+  storeClassPut (UnboxableStore set) = storePut' set
+  storeClassDelete (UnboxableStore set) = storeDelete' set
+  storeClassFor (UnboxableStore set) = storeFor' set
+  storeClassMembers (UnboxableStore set) = storeMembers' set
+  -- {-# INLINE storeClassContains #-}
+  -- {-# INLINE storeClassGet #-}
+  -- {-# INLINE storeClassPut #-}
+  -- {-# INLINE storeClassDelete #-}
+  -- {-# INLINE storeClassFor #-}
+  -- {-# INLINE storeClassMembers #-}      
+
+
+
 
 storeContains' :: Unboxable component => SU.SparseSetUnboxed component -> Entity -> IO Bool
 storeContains' !set !entity = SU.contains set (coerce entity)
@@ -37,7 +49,7 @@ storeDelete' :: Unboxable a => SU.SparseSetUnboxed a -> Entity -> IO ()
 storeDelete' !set !entity = SU.remove set (coerce entity)
 {-# INLINE storeDelete' #-}
 
-storeFor' :: (Unboxable a) => SU.SparseSetUnboxed a -> (Entity -> IO ()) -> IO ()
+storeFor' :: (MonadIO m, Unboxable a) => SU.SparseSetUnboxed a -> (Entity -> m ()) -> m ()
 storeFor' !set !f = SU.for set (coerce f)
 {-# INLINE storeFor' #-}
 

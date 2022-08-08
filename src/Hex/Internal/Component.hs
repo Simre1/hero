@@ -1,27 +1,32 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE FunctionalDependencies #-}
 module Hex.Internal.Component where
 
 -- import Data.HashTable.IO as H
-import qualified Data.Map.Strict as M
+
+import Control.Monad.IO.Class
+import Data.IORef
+import Data.Map.Strict qualified as M
 import Data.Proxy
 import Hex.Internal.Entity
 import Type.Reflection
 import Unsafe.Coerce
-import Control.Monad.IO.Class
-import Data.IORef
 
 class Typeable component => Component component where
   componentStorage :: MaxEntities -> IO (Store component)
-  
+
 newtype WrappedStorage = WrappedStorage (forall component. Store component)
 
-data Store component = Store
-  { storeContains :: Entity -> IO Bool,
-    storeGet :: Entity -> IO component,
-    storePut :: Entity -> component -> IO (),
-    storeDelete :: Entity -> IO (),
-    storeFor :: (Entity -> IO ()) -> IO (),
-    storeMembers :: IO Int
-  }
+class StoreClass store component where
+  storeClassContains :: store component -> Entity -> IO Bool
+  storeClassGet :: store component -> Entity -> IO component
+  storeClassPut :: store component -> Entity -> component -> IO ()
+  storeClassDelete :: store component -> Entity -> IO ()
+  storeClassFor :: store component -> (Entity -> IO ()) -> IO ()
+  storeClassMembers :: store component -> IO Int
+
+data Store component where
+  Store :: StoreClass store component => store component -> Store component 
 
 -- newtype Stores = Stores (H.BasicHashTable SomeTypeRep WrappedStorage)
 
@@ -29,14 +34,16 @@ newtype Stores = Stores (IORef (M.Map SomeTypeRep WrappedStorage))
 
 addStorage :: forall component. Typeable component => Stores -> Store component -> IO ()
 addStorage (Stores mapRef) store =
-  modifyIORef' mapRef $ M.insert
+  modifyIORef' mapRef $
+    M.insert
       (someTypeRep (Proxy @component))
       (WrappedStorage $ unsafeCoerce store)
 
 addComponentStorage :: forall component. (Component component, Typeable component) => Stores -> MaxEntities -> Proxy component -> IO ()
 addComponentStorage (Stores mapRef) max _ = do
   store <- componentStorage @component max
-  modifyIORef' mapRef $ M.insert
+  modifyIORef' mapRef $
+    M.insert
       (someTypeRep (Proxy @component))
       (WrappedStorage $ unsafeCoerce store)
 
@@ -57,3 +64,16 @@ getComponentStorage stores@(Stores mapRef) max = do
 
 newStores :: IO Stores
 newStores = Stores <$> newIORef M.empty
+
+storeContains :: forall component. Store component -> Entity -> IO Bool
+storeGet :: forall component. Store component -> Entity -> IO component
+storePut :: forall component. Store component -> Entity -> component -> IO ()
+storeDelete :: forall component. Store component -> Entity -> IO ()
+storeFor :: forall component. Store component -> (Entity -> IO ()) -> IO ()
+storeMembers :: forall component. Store component -> IO Int
+storeContains (Store store) = storeClassContains store
+storeGet (Store store) =  storeClassGet store 
+storePut (Store store) = storeClassPut store 
+storeDelete (Store store) = storeClassDelete store 
+storeFor (Store store) = storeClassFor store 
+storeMembers (Store store) = storeClassMembers store 
