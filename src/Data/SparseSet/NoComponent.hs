@@ -8,9 +8,9 @@ import Data.Vector.Unboxed.Mutable qualified as VU
 import Data.Word
 
 data SparseSetNoComponent = SparseSetNoComponent
-  { sparseSetSparse :: !(VU.IOVector Word32),
-    sparseSetEntities :: !(IORef (VU.IOVector Word32)),
-    sparseSetSize :: !(IORef Int)
+  { sparseSetSparse :: {-# UNPACK #-} !(VU.IOVector Word32),
+    sparseSetEntities :: {-# UNPACK #-} !(IORef (VU.IOVector Word32)),
+    sparseSetSize :: {-# UNPACK #-} !(IORef Int)
   }
 
 create :: Word32 -> Word32 -> IO (SparseSetNoComponent)

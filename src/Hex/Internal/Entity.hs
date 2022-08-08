@@ -18,7 +18,6 @@ newEntities (MaxEntities max) = do
   lastId <- newIORef 0
   pure $ Entities set lastId
 
-
 newEntity :: MaxEntities -> Entities -> IO Entity
 newEntity (MaxEntities max) (Entities entities lastIdRef) = do
   lastId <- readIORef lastIdRef

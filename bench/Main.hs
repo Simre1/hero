@@ -31,13 +31,13 @@ A.makeWorldAndComponents "ApecsWorld" [''Position, ''Velocity]
 main :: IO ()
 main = do
   !world <- makeWorld
-  apecsWorld <- makeApecsWorld
+  -- apecsWorld <- makeApecsWorld
   -- runSystem world testHex2
   -- pure ()
 
   defaultMain
-    [ bench "hex" $ nfIO $ runSystem world testHex2,  
-      bench "apecs" $ nfIO $ A.runSystem testApecs2 apecsWorld
+    [ bench "hex" $ nfIO $ runSystem world testHex2
+      -- ,bench "apecs" $ nfIO $ A.runSystem testApecs2 apecsWorld
       
     ]
 

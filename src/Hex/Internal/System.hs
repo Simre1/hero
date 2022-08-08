@@ -21,15 +21,12 @@ askStore = askWorld >>= liftIO . worldComponentStorage @component
 
 query :: (Monoid a, MonadIO m, MPS components) => (components -> QueryBody a) -> System m a
 query f = askWorld >>= lift . flip worldQuery f
-{-# INLINE query #-}
 
 query_ :: (MonadIO m, MPS components) => (components -> QueryBody ()) -> System m ()
 query_ f = askWorld >>= lift . flip worldQuery_ f
-{-# INLINE query_ #-}
 
 cMap :: (MPS a, MPS b, MonadIO m) => (a -> b) -> System m ()
 cMap f = query_ $ \a -> qPut (f a)
-{-# INLINE cMap #-}
 
 cMapM :: (MPS a, MPS b, MonadIO m, MonadUnliftIO m) => (a -> m b) -> System m ()
 cMapM f = do
@@ -38,7 +35,6 @@ cMapM f = do
     withRunInIO $ \unlift -> worldQuery_ w $ \a -> do
       b <- liftIO $ unlift $ f a
       qPut b
-{-# INLINE cMapM #-}
 
 cFold :: (Monoid r, MPS a, MonadIO m) => (a -> r) -> System m r
 cFold f = query $ \a -> pure $ f a 
