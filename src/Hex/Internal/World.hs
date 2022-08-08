@@ -11,7 +11,7 @@ data World = World
     worldMaxEntities :: {-# UNPACK #-} !MaxEntities
   }
 
-newWorld :: Word32 -> IO World
+newWorld :: MaxId => Word32 -> IO World
 newWorld !max = do
   let maxEnts = MaxEntities max
   !stores <- newStores

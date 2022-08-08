@@ -6,14 +6,20 @@ module Hex.Internal.Component where
 
 import Control.Monad.IO.Class
 import Data.IORef
-import Data.Map.Strict qualified as M
+-- import Data.Map.Strict qualified as M
 import Data.Proxy
 import Hex.Internal.Entity
 import Type.Reflection
 import Unsafe.Coerce
 
-class Typeable component => Component component where
+import qualified Data.Vector.Mutable as V
+
+class MaxId where
+  maxId :: Int
+
+class Component component where
   componentStorage :: MaxEntities -> IO (Store component)
+  componentId :: Int
 
 newtype WrappedStorage = WrappedStorage (forall component. Store component)
 
@@ -30,37 +36,32 @@ data Store component where
 
 -- newtype Stores = Stores (H.BasicHashTable SomeTypeRep WrappedStorage)
 
-newtype Stores = Stores (IORef (M.Map SomeTypeRep WrappedStorage))
+newtype Stores = Stores (V.IOVector WrappedStorage)
 
-addStorage :: forall component. Typeable component => Stores -> Store component -> IO ()
-addStorage (Stores mapRef) store =
-  modifyIORef' mapRef $
-    M.insert
-      (someTypeRep (Proxy @component))
-      (WrappedStorage $ unsafeCoerce store)
+addStorage :: forall component. Component component => Stores -> Store component -> IO ()
+addStorage (Stores ref) store =
+  V.unsafeWrite ref (componentId @component) (WrappedStorage $ unsafeCoerce store)
 
 addComponentStorage :: forall component. (Component component) => Stores -> MaxEntities -> IO ()
 addComponentStorage stores@(Stores mapRef) max = do
   store <- componentStorage @component max
   addStorage stores store
 
-getStorage :: forall component. Typeable component => Stores -> IO (Maybe (Store component))
-getStorage (Stores mapRef) =
-  unsafeCoerce $ M.lookup (someTypeRep (Proxy @component)) <$> readIORef mapRef
+getStorage :: forall component. Component component => Stores -> IO (Maybe (Store component))
+getStorage (Stores ref) = unsafeCoerce <$> V.readMaybe ref (componentId @component)
 
-getComponentStorage :: forall component. (Typeable component, Component component) => Stores -> MaxEntities -> IO (Store component)
-getComponentStorage stores@(Stores mapRef) max = do
-  map <- readIORef mapRef
-  let maybeStorage = M.lookup (someTypeRep (Proxy @component)) map
+getComponentStorage :: forall component. (Component component) => Stores -> MaxEntities -> IO (Store component)
+getComponentStorage stores@(Stores ref) max = do
+  maybeStorage <- getStorage stores
   case maybeStorage of
-    Just store -> pure $ unsafeCoerce store
+    Just store -> pure store
     Nothing -> do
       store <- componentStorage max
       addStorage stores store
       pure store
 
-newStores :: IO Stores
-newStores = Stores <$> newIORef M.empty
+newStores :: MaxId => IO Stores
+newStores = Stores <$> V.new maxId
 
 storeContains :: forall component. Store component -> Entity -> IO Bool
 storeGet :: forall component. Store component -> Entity -> IO component
