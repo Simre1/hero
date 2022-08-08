@@ -26,19 +26,19 @@ library
     hs-source-dirs:   src
     exposed-modules:
         Data.SparseSet.Unboxed,
+        Data.SparseSet.Storable,
         Data.SparseSet.NoComponent,
         Hex.Internal.World,
         Hex.Internal.Component,
         Hex.Internal.Entity,
         Hex.Internal.System,
         Hex.Internal.Query,
-        Hex.Internal.Component.UnboxedSet
+        Hex.Internal.Component.SparseSet
 
     default-language: GHC2021
     default-extensions:
         DataKinds
         TypeFamilies
-        Strict
     ghc-options: -O2
 
 test-suite ecs
@@ -50,7 +50,7 @@ test-suite ecs
 
 executable bench
     main-is: Main.hs
-    build-depends:    base >4.13.0.0, ecs, tasty, tasty-bench, apecs, transformers
+    build-depends:    base >4.13.0.0, ecs, tasty, tasty-bench, apecs, transformers, derive-storable, derive-storable-plugin
     hs-source-dirs:   bench
     default-language: GHC2021
     ghc-options: -O2

@@ -38,10 +38,10 @@ create sparseSize denseSize = do
 
 insert :: (VU.Unboxable a) => SparseSetUnboxed a -> Word32 -> a -> IO ()
 insert set@(SparseSetUnboxed sparse entitiesRef denseRef sizeRef) i a = do
-  index <- VU.read sparse (fromIntegral i)
+  index <- VU.unsafeRead sparse (fromIntegral i)
   dense <- readIORef denseRef
   if index /= maxBound
-    then VU.write dense (fromIntegral index) a
+    then VU.unsafeWrite dense (fromIntegral index) a
     else do
       nextIndex <- atomicModifyIORef' sizeRef (\i -> (succ i, i))
       let denseSize = VU.length dense
@@ -49,21 +49,21 @@ insert set@(SparseSetUnboxed sparse entitiesRef denseRef sizeRef) i a = do
         if (nextIndex >= denseSize)
           then do
             dense <- readIORef denseRef
-            newDense <- VU.grow dense (denseSize `quot` 2)
+            newDense <- VU.unsafeGrow dense (denseSize `quot` 2)
             writeIORef denseRef newDense
             entities <- readIORef entitiesRef
-            newEntities <- VU.grow entities (denseSize `quot` 2)
+            newEntities <- VU.unsafeGrow entities (denseSize `quot` 2)
             writeIORef entitiesRef newEntities
             pure (newDense, newEntities)
           else (,) <$> readIORef denseRef <*> readIORef entitiesRef
-      VU.write dense nextIndex a
-      VU.write entities nextIndex i
-      VU.write sparse (fromIntegral i) (fromIntegral nextIndex)
+      VU.unsafeWrite dense nextIndex a
+      VU.unsafeWrite entities nextIndex i
+      VU.unsafeWrite sparse (fromIntegral i) (fromIntegral nextIndex)
 {-# INLINE insert #-}
 
 contains :: VU.Unboxable a => SparseSetUnboxed a -> Word32 -> IO Bool
 contains (SparseSetUnboxed sparse entities dense _) i = do
-  v <- VU.read sparse (fromIntegral i)
+  v <- VU.unsafeRead sparse (fromIntegral i)
   pure $ v /= (maxBound :: Word32)
 {-# INLINE contains #-}
 
@@ -73,21 +73,21 @@ size (SparseSetUnboxed _ entities _ sizeRef) = readIORef sizeRef
 
 lookup :: VU.Unboxable a => SparseSetUnboxed a -> Word32 -> IO (Maybe a)
 lookup (SparseSetUnboxed sparse _ denseRef _) i = do
-  index <- VU.read sparse (fromIntegral i)
+  index <- VU.unsafeRead sparse (fromIntegral i)
   if index /= maxBound
-    then readIORef denseRef >>= \dense -> Just <$> VU.read dense (fromIntegral index)
+    then readIORef denseRef >>= \dense -> Just <$> VU.unsafeRead dense (fromIntegral index)
     else pure Nothing
 {-# INLINE lookup #-}
 
 unsafeLookup :: VU.Unboxable a => SparseSetUnboxed a -> Word32 -> IO a
 unsafeLookup (SparseSetUnboxed sparse _ denseRef _) i = do
-  index <- VU.read sparse (fromIntegral i)
-  readIORef denseRef >>= \dense -> VU.read dense (fromIntegral index)
+  index <- VU.unsafeRead sparse (fromIntegral i)
+  readIORef denseRef >>= \dense -> VU.unsafeRead dense (fromIntegral index)
 {-# INLINE unsafeLookup #-}
 
 remove :: VU.Unboxable a => SparseSetUnboxed a -> Word32 -> IO ()
 remove (SparseSetUnboxed sparse entitiesRef denseRef sizeRef) i = do
-  index <- VU.read sparse (fromIntegral i)
+  index <- VU.unsafeRead sparse (fromIntegral i)
   if index == maxBound
     then pure ()
     else do
@@ -95,23 +95,26 @@ remove (SparseSetUnboxed sparse entitiesRef denseRef sizeRef) i = do
       entities <- readIORef entitiesRef
       lastDenseIndex <- atomicModifyIORef' sizeRef (\x -> (pred x, pred x))
 
-      lastElement <- VU.read dense lastDenseIndex
-      lastKey <- VU.read entities lastDenseIndex
+      lastElement <- VU.unsafeRead dense lastDenseIndex
+      lastKey <- VU.unsafeRead entities lastDenseIndex
 
-      VU.write dense (fromIntegral index) lastElement
-      VU.write entities (fromIntegral index) lastKey
+      VU.unsafeWrite dense (fromIntegral index) lastElement
+      VU.unsafeWrite entities (fromIntegral index) lastKey
 
-      VU.write sparse (fromIntegral lastKey) index
-      VU.write sparse (fromIntegral i) maxBound
+      VU.unsafeWrite sparse (fromIntegral lastKey) index
+      VU.unsafeWrite sparse (fromIntegral i) maxBound
 {-# INLINE remove #-}
 
-for :: (MonadIO m, VU.Unboxable a) => SparseSetUnboxed a -> (Word32 -> m ()) -> m ()
-for (SparseSetUnboxed _ entitiesRef _ sizeRef) f = do
+for :: (MonadIO m, VU.Unboxable a) => SparseSetUnboxed a -> (Word32 -> a -> m ()) -> m ()
+for (SparseSetUnboxed _ entitiesRef denseRef sizeRef) f = do
   entities <- liftIO $ readIORef entitiesRef
+  dense <- liftIO $ readIORef denseRef
+
   size <- liftIO $ readIORef sizeRef
   forM_ [0 .. pred size] $ \i -> do
-    key <- liftIO $ VU.read entities i
-    f key
+    key <- liftIO $ VU.unsafeRead entities i
+    val <- liftIO $ VU.unsafeRead dense i
+    f key val
 {-# INLINE for #-}
 
 visualize (SparseSetUnboxed sparse entities _ sizeRef) = do

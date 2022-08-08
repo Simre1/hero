@@ -22,7 +22,7 @@ class StoreClass store component where
   storeClassGet :: store component -> Entity -> IO component
   storeClassPut :: store component -> Entity -> component -> IO ()
   storeClassDelete :: store component -> Entity -> IO ()
-  storeClassFor :: store component -> (Entity -> IO ()) -> IO ()
+  storeClassFor :: store component -> (Entity -> component -> IO ()) -> IO ()
   storeClassMembers :: store component -> IO Int
 
 data Store component where
@@ -40,12 +40,9 @@ addStorage (Stores mapRef) store =
       (WrappedStorage $ unsafeCoerce store)
 
 addComponentStorage :: forall component. (Component component, Typeable component) => Stores -> MaxEntities -> Proxy component -> IO ()
-addComponentStorage (Stores mapRef) max _ = do
+addComponentStorage stores@(Stores mapRef) max _ = do
   store <- componentStorage @component max
-  modifyIORef' mapRef $
-    M.insert
-      (someTypeRep (Proxy @component))
-      (WrappedStorage $ unsafeCoerce store)
+  addStorage stores store
 
 getStorage :: forall component. Typeable component => Stores -> IO (Maybe (Store component))
 getStorage (Stores mapRef) =
@@ -69,7 +66,7 @@ storeContains :: forall component. Store component -> Entity -> IO Bool
 storeGet :: forall component. Store component -> Entity -> IO component
 storePut :: forall component. Store component -> Entity -> component -> IO ()
 storeDelete :: forall component. Store component -> Entity -> IO ()
-storeFor :: forall component. Store component -> (Entity -> IO ()) -> IO ()
+storeFor :: forall component. Store component -> (Entity -> component -> IO ()) -> IO ()
 storeMembers :: forall component. Store component -> IO Int
 storeContains (Store store) = storeClassContains store
 storeGet (Store store) =  storeClassGet store 

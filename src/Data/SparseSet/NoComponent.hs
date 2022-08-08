@@ -23,7 +23,7 @@ create sparseSize denseSize = do
 
 insert :: SparseSetNoComponent -> Word32 -> IO ()
 insert set@(SparseSetNoComponent sparse entitiesRef sizeRef) i = do
-  index <- VU.read sparse (fromIntegral i)
+  index <- VU.unsafeRead sparse (fromIntegral i)
   if index == maxBound
     then do
       entities <- readIORef entitiesRef
@@ -33,18 +33,18 @@ insert set@(SparseSetNoComponent sparse entitiesRef sizeRef) i = do
         if (nextIndex >= entitiesSize)
           then do
             entities <- readIORef entitiesRef
-            newEntities <- VU.grow entities (entitiesSize `quot` 2)
+            newEntities <- VU.unsafeGrow entities (entitiesSize `quot` 2)
             writeIORef entitiesRef newEntities
             pure newEntities
           else readIORef entitiesRef
-      VU.write entities nextIndex i
-      VU.write sparse (fromIntegral i) (fromIntegral nextIndex)
+      VU.unsafeWrite entities nextIndex i
+      VU.unsafeWrite sparse (fromIntegral i) (fromIntegral nextIndex)
     else pure ()
 {-# INLINE insert #-}
 
 contains :: SparseSetNoComponent -> Word32 -> IO Bool
 contains (SparseSetNoComponent sparse entities _) i = do
-  v <- VU.read sparse (fromIntegral i)
+  v <- VU.unsafeRead sparse (fromIntegral i)
   pure $ v /= (maxBound :: Word32)
 {-# INLINE contains #-}
 
@@ -54,16 +54,16 @@ size (SparseSetNoComponent _ _ sizeRef) = readIORef sizeRef
 
 remove :: SparseSetNoComponent -> Word32 -> IO ()
 remove (SparseSetNoComponent sparse entitiesRef sizeRef) i = do
-  index <- VU.read sparse (fromIntegral i)
+  index <- VU.unsafeRead sparse (fromIntegral i)
   if index == maxBound
     then pure ()
     else do
       entities <- readIORef entitiesRef
       lastEntitiesIndex <- atomicModifyIORef' sizeRef (\x -> (pred x, pred x))
-      lastKey <- VU.read entities lastEntitiesIndex
-      VU.write entities (fromIntegral index) lastKey
-      VU.write sparse (fromIntegral lastKey) index
-      VU.write sparse (fromIntegral i) maxBound
+      lastKey <- VU.unsafeRead entities lastEntitiesIndex
+      VU.unsafeWrite entities (fromIntegral index) lastKey
+      VU.unsafeWrite sparse (fromIntegral lastKey) index
+      VU.unsafeWrite sparse (fromIntegral i) maxBound
 {-# INLINE remove #-}
 
 for :: MonadIO m => SparseSetNoComponent -> (Word32 -> m ()) -> m ()
@@ -71,7 +71,7 @@ for (SparseSetNoComponent _ entitiesRef sizeRef) f = do
   entities <- liftIO $ readIORef entitiesRef
   size <- liftIO $ readIORef sizeRef
   forM_ [0 .. pred size] $ \i -> do
-    key <- liftIO $ VU.read entities i
+    key <- liftIO $ VU.unsafeRead entities i
     f key
 {-# INLINE for #-}
 

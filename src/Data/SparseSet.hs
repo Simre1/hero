@@ -21,18 +21,18 @@ create sparseSize denseSize = do
 
 insert :: (VU.Unbox a) => SparseSet a -> Word32 -> a -> IO ()
 insert set@(SparseSet sparse entities dense sizeRef) i a = do
-  index <- VU.read sparse (fromIntegral i)
+  index <- VU.unsafeRead sparse (fromIntegral i)
   if index == maxBound
     then do
       nextIndex <- atomicModifyIORef' sizeRef (\i -> (succ i, i))
-      VU.write dense nextIndex a
-      VU.write entities nextIndex i
-      VU.write sparse (fromIntegral i) (fromIntegral nextIndex)
-    else VU.write dense (fromIntegral index) a
+      VU.unsafeWrite dense nextIndex a
+      VU.unsafeWrite entities nextIndex i
+      VU.unsafeWrite sparse (fromIntegral i) (fromIntegral nextIndex)
+    else VU.unsafeWrite dense (fromIntegral index) a
 
 contains :: VU.Unbox a => SparseSet a -> Word32 -> IO Bool
 contains (SparseSet sparse entities dense _) i = do
-  v <- VU.read sparse (fromIntegral i)
+  v <- VU.unsafeRead sparse (fromIntegral i)
   pure $ v /= (maxBound :: Word32)
 
 size :: SparseSet a -> IO Int
@@ -40,26 +40,26 @@ size (SparseSet _ entities _ sizeRef) = readIORef sizeRef
 
 lookup :: VU.Unbox a => SparseSet a -> Word32 -> IO (Maybe a)
 lookup (SparseSet sparse entities dense _) i = do
-  index <- VU.read sparse (fromIntegral i)
+  index <- VU.unsafeRead sparse (fromIntegral i)
   if index == maxBound
     then pure Nothing
-    else Just <$> VU.read dense (fromIntegral index)
+    else Just <$> VU.unsafeRead dense (fromIntegral index)
 
 remove :: VU.Unbox a => SparseSet a -> Word32 -> IO ()
 remove (SparseSet sparse entities dense sizeRef) i = do
-  index <- VU.read sparse (fromIntegral i)
+  index <- VU.unsafeRead sparse (fromIntegral i)
   if index == maxBound
     then pure ()
     else do
       lastDenseIndex <- atomicModifyIORef' sizeRef (\x -> (pred x, x))
 
-      lastElement <- VU.read dense lastDenseIndex
-      lastKey <- VU.read entities lastDenseIndex
+      lastElement <- VU.unsafeRead dense lastDenseIndex
+      lastKey <- VU.unsafeRead entities lastDenseIndex
 
-      VU.write dense (fromIntegral index) lastElement
-      VU.write entities (fromIntegral index) lastKey
+      VU.unsafeWrite dense (fromIntegral index) lastElement
+      VU.unsafeWrite entities (fromIntegral index) lastKey
 
       
-      VU.write sparse (fromIntegral lastKey) index
-      VU.write sparse (fromIntegral i) maxBound
+      VU.unsafeWrite sparse (fromIntegral lastKey) index
+      VU.unsafeWrite sparse (fromIntegral i) maxBound
      

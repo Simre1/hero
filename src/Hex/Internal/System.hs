@@ -8,6 +8,8 @@ import Hex.Internal.Entity
 import Hex.Internal.Query
 import Hex.Internal.World
 import UnliftIO
+import Data.Coerce
+import Data.Monoid (Endo(..), Dual (..))
 
 newtype System m a = System (ReaderT World m a) deriving (Functor, Applicative, Monad, MonadIO, MonadTrans)
 
@@ -44,6 +46,14 @@ cFoldM f = do
   w <- askWorld
   lift $ withRunInIO $ \unlift -> worldQuery w $ \a -> liftIO $ unlift (f a) 
 
+cFoldr :: (MPS a, MonadIO m) => (a -> b -> b) -> b -> System m b
+cFoldr f b = fmap (($ b) . appEndo) $ cFold $ Endo #. f
+{-# INLINE cFoldr #-}
+
+cFoldl :: (MPS a, MonadIO m) => (b -> a -> b) -> b -> System m b
+cFoldl f b = fmap (($ b) . appEndo . getDual) $ cFold $ Dual . Endo . flip f
+{-# INLINE cFoldl #-}
+
 newEntity' :: MonadIO m => System m Entity
 newEntity' = askWorld >>= liftIO . worldNewEntity
 {-# INLINE newEntity' #-}
@@ -66,3 +76,8 @@ putEntity entity a = do
 runSystem :: World -> System m a -> m a
 runSystem w (System r) = runReaderT r w
 {-# INLINE runSystem #-}
+
+-- See Data.Foldable
+(#.) :: Coercible b c => (b -> c) -> (a -> b) -> (a -> c)
+(#.) _f = coerce
+{-# INLINE (#.) #-}

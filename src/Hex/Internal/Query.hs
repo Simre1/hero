@@ -32,16 +32,16 @@ qAsk = QueryBody $ ask
 
 worldQuery_ :: forall components m a. (MonadIO m, MPS components) => World -> (components -> QueryBody ()) -> m ()
 worldQuery_ w f = liftIO $
-  multiFor @(S components) @components w $ \e -> do
-    comps <- multiGet @(S components) w e
+  multiFor @(S components) @components w $ \e comps -> do
+    -- comps <- multiGet @(S components) w e
     runReaderT (runQueryBody (f comps)) (w, e)
 {-# INLINE worldQuery_ #-}
 
 worldQuery :: forall components m a. (Monoid a, MonadIO m, MPS components) => World -> (components -> QueryBody a) -> m a
 worldQuery w f = liftIO $ do
   ref <- newIORef mempty
-  multiFor @(S components) @components w $ \e -> do
-    comps <- multiGet @(S components) w e
+  multiFor @(S components) @components w $ \e comps -> do
+    -- comps <- multiGet @(S components) w e
     a <- runReaderT (runQueryBody (f comps)) (w, e)
     modifyIORef' ref (<> a)
   readIORef ref
@@ -56,7 +56,9 @@ qDelete = qAsk >>= \(w, e) -> liftIO $ multiDelete @(S components) @components w
 {-# INLINE qDelete #-}
 
 type family SingleComponent a where
+  SingleComponent () = False
   SingleComponent (a, b) = False
+  SingleComponent (a, b, c) = False
   SingleComponent _ = True
 
 data MultiComponentParams components = MCParams Bool components
@@ -66,7 +68,7 @@ class MultiComponent (f :: Bool) components where
   multiGet :: World -> Entity -> IO components
   multiPut :: World -> Entity -> components -> IO ()
   multiDelete :: World -> Entity -> IO ()
-  multiFor :: World -> (Entity -> IO ()) -> IO ()
+  multiFor :: World -> (Entity -> components -> IO ()) -> IO ()
   multiMembers :: World -> IO Int
 
 type MP = MultiComponent
@@ -74,6 +76,20 @@ type MP = MultiComponent
 type MPS a = MP (S a) a
 
 type S a = SingleComponent a
+
+instance MultiComponent False () where
+  multiContains w e = pure False
+  multiGet w e = pure ()
+  multiPut w e c = pure ()
+  multiDelete w e = pure ()
+  multiFor w f = pure ()
+  multiMembers w = pure 0
+  {-# INLINE multiContains #-}
+  {-# INLINE multiGet #-}
+  {-# INLINE multiPut #-}
+  {-# INLINE multiDelete #-}
+  {-# INLINE multiFor #-}
+  {-# INLINE multiMembers #-}
 
 instance Component a => MultiComponent True a where
   multiContains w e = worldComponentStorage @a w >>= flip storeContains e
@@ -95,15 +111,19 @@ instance (MPS a, MPS b) => MultiComponent False (a, b) where
   multiPut w e (a, b) = multiPut @(S a) w e a *> multiPut @(S b) w e b
   multiDelete w e = multiDelete @(S a) @a w e *> multiDelete @(S b) @b w e
   multiFor w f = do
-    amount1 <- multiMembers @(S a) @a w
-    amount2 <- multiMembers @(S b) @b w
-    if amount1 > amount2
-      then multiFor @(S b) @b w $ \e -> do
+    amountA <- multiMembers @(S a) @a w
+    amountB <- multiMembers @(S b) @b w
+    if amountA > amountB
+      then multiFor @(S b) @b w $ \e bs -> do
         contained <- multiContains @(S a) @a w e
-        when contained $ f e
-      else multiFor @(S b) @b w $ \e -> do
+        when contained $ do
+          as <- multiGet @(S a) @a w e
+          f e (as, bs)
+      else multiFor @(S a) @a w $ \e as -> do
         contained <- multiContains @(S a) @a w e
-        when contained $ f e
+        when contained $ do
+          bs <- multiGet @(S b) @b w e
+          f e (as, bs)
   multiMembers w = min <$> multiMembers @(S a) @a w <*> multiMembers @(S b) @b w
   {-# INLINE multiContains #-}
   {-# INLINE multiGet #-}
@@ -124,24 +144,36 @@ instance (MPS a, MPS b, MPS c) => MultiComponent False (a, b, c) where
     if amountA > amountB
       then
         if amountB > amountC
-          then multiFor @(S c) @c w $ \e -> do
+          then multiFor @(S c) @c w $ \e cs -> do
             containedA <- multiContains @(S a) @a w e
             containedB <- multiContains @(S b) @b w e
-            when (containedA && containedB) $ f e
-          else multiFor @(S b) @b w $ \e -> do
+            when (containedA && containedB) $ do
+              as <- multiGet @(S a) @a w e
+              bs <- multiGet @(S b) @b w e
+              f e (as, bs, cs)
+          else multiFor @(S b) @b w $ \e bs ->  do
             containedA <- multiContains @(S a) @a w e
             containedC <- multiContains @(S c) @c w e
-            when (containedA && containedC) $ f e
+            when (containedA && containedC) $ do
+              as <- multiGet @(S a) @a w e
+              cs <- multiGet @(S c) @c w e
+              f e (as, bs, cs)
       else
         if amountA > amountC
-          then multiFor @(S c) @c w $ \e -> do
+          then multiFor @(S c) @c w $ \e cs -> do
             containedA <- multiContains @(S a) @a w e
             containedB <- multiContains @(S b) @b w e
-            when (containedA && containedB) $ f e
-          else multiFor @(S a) @a w $ \e -> do
+            when (containedA && containedB) $ do
+              as <- multiGet @(S a) @a w e
+              bs <- multiGet @(S b) @b w e
+              f e (as, bs, cs)
+          else multiFor @(S a) @a w $ \e as -> do
             containedB <- multiContains @(S b) @b w e
             containedC <- multiContains @(S c) @c w e
-            when (containedB && containedC) $ f e
+            when (containedB && containedB) $ do
+              cs <- multiGet @(S c) @c w e
+              bs <- multiGet @(S b) @b w e
+              f e (as, bs, cs)
   multiMembers w = min <$> (min <$> multiMembers @(S a) @a w <*> multiMembers @(S b) @b w) <*> multiMembers @(S c) @c w
   {-# INLINE multiContains #-}
   {-# INLINE multiGet #-}
