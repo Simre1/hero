@@ -11,6 +11,20 @@ import UnliftIO
 import Data.Coerce
 import Data.Monoid (Endo(..), Dual (..))
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 newtype System m a = System (ReaderT World m a) deriving (Functor, Applicative, Monad, MonadIO, MonadTrans)
 
 askWorld :: Monad m => System m World

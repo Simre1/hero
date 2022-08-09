@@ -35,6 +35,8 @@ library
         Hex.Internal.Entity,
         Hex.Internal.System,
         Hex.Internal.Query,
+        Hex.Internal.NewQuery,
+
         Hex.Internal.Component.SparseSet
 
     default-language: GHC2021

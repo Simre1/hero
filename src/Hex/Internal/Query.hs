@@ -11,8 +11,6 @@ import Hex.Internal.Component
 import Hex.Internal.Entity
 import Hex.Internal.World (World (..), worldComponentStorage)
 
-newtype Query i m s = Query (i -> m s)
-
 data QueryHead components = QueryGet
 
 newtype QueryBody a = QueryBody {runQueryBody :: ReaderT (World, Entity) IO a} deriving (Functor, Applicative, Monad, MonadIO)
