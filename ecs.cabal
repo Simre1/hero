@@ -22,7 +22,7 @@ maintainer:         simre4775@gmail.com
 extra-source-files: CHANGELOG.md
 
 library
-    build-depends:    base >4.13.0.0, vector > 0.13, transformers, unliftio, containers
+    build-depends:    base >4.13.0.0, vector > 0.13, transformers, unliftio, containers, template-haskell
     hs-source-dirs:   src
     exposed-modules:
         Data.SparseSet.Unboxed,
@@ -30,6 +30,8 @@ library
         Data.SparseSet.NoComponent,
         Hex.Internal.World,
         Hex.Internal.Component,
+        Hex.Internal.Component.ComponentId,
+
         Hex.Internal.Entity,
         Hex.Internal.System,
         Hex.Internal.Query,
@@ -50,7 +52,7 @@ test-suite ecs
 
 executable bench
     main-is: Main.hs
-    build-depends:    base >4.13.0.0, ecs, tasty, tasty-bench, transformers, derive-storable, derive-storable-plugin
+    build-depends:    base >4.13.0.0, ecs, gauge, transformers, derive-storable, derive-storable-plugin
     hs-source-dirs:   bench
     default-language: GHC2021
     ghc-options: -O2
