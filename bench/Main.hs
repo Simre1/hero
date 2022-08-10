@@ -10,7 +10,7 @@ import Hex.Internal.Component
 import Hex.Internal.Component.ComponentId
 import Hex.Internal.Component.SparseSet
 import Hex.Internal.Entity (Entity (..), MaxEntities (MaxEntities))
-import Hex.Internal.NewSystem
+import Hex.Internal.System
 import Hex.Internal.World
 import GHC.Generics (Generic)
 import Foreign.Storable.Generic (GStorable)
