@@ -9,50 +9,59 @@ import Control.Monad.IO.Class
 import Hex.Internal.Component
 import Hex.Internal.Component.SparseSet
 import Hex.Internal.Entity (Entity (..), MaxEntities (MaxEntities))
-import Hex.Internal.System
+import Hex.Internal.NewQuery
 import Hex.Internal.World
 import GHC.Generics (Generic)
 import Foreign.Storable.Generic (GStorable)
+import Control.Arrow
 
 data Position = Position Int Int deriving (Generic)
 
 instance GStorable Position
 
-instance Component Position where
-  componentStorage = storedSet
-
 data Velocity = Velocity Int Int deriving (Generic)
 
 instance GStorable Velocity
-
-instance Component Velocity where
-  componentStorage = storedSet
 
 data Acceleration = Acceleration Int Int deriving (Generic)
 
 instance GStorable Acceleration
 
-instance Component Acceleration where
+instance Component Position where
   componentStorage = storedSet
 
+instance Component Velocity where
+  componentStorage = storedSet
 
+instance Component Acceleration where
+  componentStorage = storedSet
 main :: IO ()
 main = do
-  !world <- makeWorld
-  runSystem world physics
-  
-makeWorld :: IO World
-makeWorld = do
+  -- runSystem world testHex2
+  -- pure ()
+  world <- physicsWorld
+  run <- compileSystem world physics
+  run ()
+
+physicsWorld :: IO World
+physicsWorld = do
   world <- newWorld 10000
-  worldAddComponentStorage @Position world
-  worldAddComponentStorage @Velocity world
-  worldAddComponentStorage @Acceleration world
+  worldComponent @Position world
+
+  make <- compileSystem world $ SystemNewEntity
+  
+  forM_ [0..2000] $ \i ->
+    make (Position 0 i, Velocity 0 0, Acceleration 1 0)
+  
   pure world
 
-physics :: System IO ()
-physics = do
-  forM_ [0 .. 1000] $ \_ -> do
-    cMap $ \(Velocity vx vy, Acceleration ax ay) -> Velocity (vx + ax) (vy + ay)
-    cMap $ \(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy)
-    cFoldl (\s (Position x y) -> s + x + y) (0 :: Int)
-  pure ()
+physics :: System IO () ()
+physics = foldl (>>>) sys $ const sys <$> [1..500]
+  where sys = 
+          cmap (\(Velocity vx vy, Acceleration ax ay) -> Velocity (vx + ax) (vy + ay)) >>>
+          cmap (\(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy)) >>>
+          cfoldl (\s (Position x y) -> s + x + y) (0 :: Int) *> pure ()
+            -- *> cmapM (\(Position x y) -> print y)
+          -- >>> SystemMap (liftIO . print)
+        {-# INLINE sys #-}
+            

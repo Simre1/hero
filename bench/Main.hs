@@ -33,18 +33,12 @@ instance GStorable Acceleration
 
 instance Component Position where
   componentStorage = storedSet
-  componentId = 0
 
 instance Component Velocity where
   componentStorage = storedSet
-  componentId = 1
 
 instance Component Acceleration where
   componentStorage = storedSet
-  componentId = 2
-
-instance ComponentAmount where
-  componentAmount = 3
 
 main :: IO ()
 main = do
@@ -69,11 +63,11 @@ physicsWorld = do
   pure world
 
 physics :: System IO () ()
-physics = foldl (*>) sys $ const sys <$> [1..500]
+physics = foldl (>>>) sys $ const sys <$> [1..500]
   where sys = 
-          cmap (\(Velocity vx vy, Acceleration ax ay) -> Velocity (vx + ax) (vy + ay)) *>
-          cmap (\(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy)) *>
-          cfoldl (\s (Position x y) -> s + x + y) (0 :: Int) *> pure ()
+          cmap (\(Velocity vx vy, Acceleration ax ay) -> Velocity (vx + ax) (vy + ay)) >>>
+          cmap (\(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy)) >>>
+          cfoldl (\s (Position x y) -> s + x + y) (0 :: Int) >>> pure ()
             -- *> cmapM (\(Position x y) -> print y)
           -- >>> SystemMap (liftIO . print)
             

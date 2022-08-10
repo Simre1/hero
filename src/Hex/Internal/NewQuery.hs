@@ -28,35 +28,54 @@ data Query m i o where
 instance Applicative m => Category (Query m) where
   id = QueryMap pure
   (.) = flip QueryCompose
+  {-# INLINE id #-}
+  {-# INLINE (.) #-}
+
 
 instance Applicative m => Arrow (Query m) where
   arr f = QueryMap (pure . f)
   (***) = QueryPar
+  {-# INLINE (***) #-}
+  {-# INLINE arr #-}
+
 
 data System m i o where
   SystemExec :: QC i1 => Query m (i1, i2) () -> System m i2 ()
   SystemSingle :: Query m i o -> Entity -> System m i o
   SystemFor :: (QC i1, Monoid o) => Query m (i1,i2) o -> System m i2 o
   SystemNewEntity :: QC c => System m c Entity
-  SystemMap :: (i -> m o) -> System m i o
+  SystemMapM :: (i -> m o) -> System m i o
+  SystemMap :: (i -> o) -> System m i o
   SystemSeq :: System m a b -> System m b c -> System m a c
   SystemPar :: System m a1 b1 -> System m a2 b2 -> System m (a1,a2) (b1,b2)
 
 instance Applicative m => Functor (System m i) where
-  fmap f !s = SystemSeq s (SystemMap $ pure . f)
+  fmap f !s = SystemSeq s (SystemMap $ f)
+  {-# INLINE fmap #-}
 
 instance Applicative m => Applicative (System m i) where
-  pure a = SystemMap $ \_ -> pure a
-  !s1 <*> !s2 = SystemSeq (SystemSeq (SystemMap (\a -> pure (a,a))) 
-    (SystemPar s1 s2)) (SystemMap (\(f,a) -> pure $ f a) )
+  pure a = SystemMap $ \_ -> a
+  !s1 <*> !s2 = SystemSeq (SystemSeq (SystemMap (\a -> (a,a))) 
+    (SystemPar s1 s2)) (SystemMap (\(f,a) -> f a) )
+  {-# INLINE (<*>) #-}
+  {-# INLINE pure #-}
+
+
 
 instance Applicative m => Category (System m) where
-  id = SystemMap (pure . id)
+  id = SystemMap (id)
   !s1 . !s2 = SystemSeq s2 s1
+  {-# INLINE id #-}
+  {-# INLINE (.) #-}
+
+
 
 instance Applicative m => Arrow (System m) where
-  arr f = SystemMap (pure . f)
+  arr f = SystemMap f
   !s1 *** !s2 = SystemPar s1 s2
+  {-# INLINE (***) #-}
+  {-# INLINE arr #-}
+
 
 -- newtype CompiledQuery m i a = CompiledQuery (i -> Entity -> m a)
 
@@ -86,7 +105,8 @@ compileSystem !w q = case q of
       e <- worldNewEntity w
       put e c
       pure e
-  SystemMap !f -> pure f
+  SystemMap !f -> pure $ pure . f
+  SystemMapM !f -> pure f
   SystemSeq !s1 !s2 -> do
     f1 <- compileSystem w s1
     f2 <- compileSystem w s2
@@ -122,12 +142,16 @@ cmap f = SystemExec (arr (f . fst) >>> QueryPut)
 
 cmapM :: (QC a, QC b) => (a -> IO b) -> System IO () ()
 cmapM f = SystemExec (QueryMap (f . fst) >>> QueryPut)
+{-# INLINE cmapM #-}
 
 cfold :: (Monoid o, QC a, MonadIO m) => (a -> o) -> System m () o
 cfold f = SystemFor (QueryMap (pure . f . fst))
+{-# INLINE cfold #-}
+
 
 cfoldM :: (Monoid o, QC a) => (a -> IO o) -> System IO i o
 cfoldM f = SystemFor (QueryMap (f . fst))
+{-# INLINE cfoldM #-}
 
 cfoldr :: (QC a, MonadIO m) => (a -> b -> b) -> b -> System IO () b
 cfoldr f b = fmap (($ b) . appEndo) $ cfold $ Endo #. f

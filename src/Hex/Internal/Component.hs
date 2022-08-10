@@ -20,12 +20,8 @@ import Unsafe.Coerce
 
 newtype ComponentId = ComponentId {unwrapComponentId :: Int} deriving (Show)
 
-class ComponentAmount where
-  componentAmount :: Int
-
 class Typeable component => Component component where
   componentStorage :: MaxEntities -> IO (Store component)
-  componentId :: Int
 
 newtype WrappedStorage = WrappedStorage (forall component. Store component)
 
