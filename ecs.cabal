@@ -36,6 +36,8 @@ library
         Hex.Internal.System,
         Hex.Internal.Query,
         Hex.Internal.NewQuery,
+        Hex.Internal.NewSystem,
+
 
         Hex.Internal.Component.SparseSet
 

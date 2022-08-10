@@ -40,7 +40,7 @@ main = do
   -- runSystem world testHex2
   -- pure ()
   world <- physicsWorld
-  run <- compileSystem world physics
+  run <- compileSystem physics world
   run ()
 
 physicsWorld :: IO World
@@ -48,7 +48,7 @@ physicsWorld = do
   world <- newWorld 10000
   worldComponent @Position world
 
-  make <- compileSystem world $ SystemNewEntity
+  make <- compileSystem SystemNewEntity world
   
   forM_ [0..2000] $ \i ->
     make (Position 0 i, Velocity 0 0, Acceleration 1 0)

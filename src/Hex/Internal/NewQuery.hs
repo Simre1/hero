@@ -1,9 +1,10 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Hex.Internal.NewQuery where
 
-import Control.Monad (when)
+import Control.Monad (when, (<$!>))
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import Data.IORef
@@ -16,6 +17,7 @@ import Prelude hiding ((.), id)
 import Data.Functor
 import Data.Coerce
 import Data.Monoid
+import Language.Haskell.TH
 
 
 data Query m i o where
@@ -50,11 +52,11 @@ data System m i o where
   SystemPar :: System m a1 b1 -> System m a2 b2 -> System m (a1,a2) (b1,b2)
 
 instance Applicative m => Functor (System m i) where
-  fmap f !s = SystemSeq s (SystemMap $ f)
+  fmap f !s = SystemSeq s (SystemMap $! f)
   {-# INLINE fmap #-}
 
 instance Applicative m => Applicative (System m i) where
-  pure a = SystemMap $ \_ -> a
+  pure a = SystemMap $! \_ -> a
   !s1 <*> !s2 = SystemSeq (SystemSeq (SystemMap (\a -> (a,a))) 
     (SystemPar s1 s2)) (SystemMap (\(f,a) -> f a) )
   {-# INLINE (<*>) #-}
@@ -81,60 +83,131 @@ instance Applicative m => Arrow (System m) where
 
 data QueryContext = QueryContext ()
 
-compileSystem :: World -> System IO i o -> IO (i -> IO o)
-compileSystem !w q = case q of
+compileSystem :: System IO i o -> World -> IO (i -> IO o)
+compileSystem !q !w = case q of
   SystemExec @i1 !q -> do
-    cQ <- compileQuery w q
+    cQ <- compileQuery q w
     for <- queryFor @(S i1) @i1 w
-    pure $ \i2 -> for $ \e i1 -> cQ (i1,i2) e
+    pure $! \i2 -> for $! \e i1 -> cQ (i1,i2) e
   SystemSingle !q !e -> do
-    cQ <- compileQuery w q
-    pure $ \i -> cQ i e
+    cQ <- compileQuery q w
+    pure $! \i -> cQ i e
   SystemFor @i1 @o !q -> do
-    cQ <- compileQuery w q
+    cQ <- compileQuery q w
     for <- queryFor @(S i1) @i1 w
-    pure $ \i2 -> do
+    pure $! \i2 -> do
       ref <- newIORef (mempty :: o)
-      for $ \e i1 -> do
+      for $! \e i1 -> do
         o <- cQ (i1,i2) e
         modifyIORef ref (<> o)
       readIORef ref
   SystemNewEntity @c -> do
     put <- queryPut @(S c) @c w
-    pure $ \c -> do
+    pure $! \c -> do
       e <- worldNewEntity w
       put e c
       pure e
-  SystemMap !f -> pure $ pure . f
+  SystemMap !f -> pure $! pure . f
   SystemMapM !f -> pure f
   SystemSeq !s1 !s2 -> do
-    f1 <- compileSystem w s1
-    f2 <- compileSystem w s2
-    pure $ \i -> f1 i >>= f2
+    f1 <- compileSystem s1 w
+    f2 <- compileSystem s2 w
+    pure $! \i -> f1 i >>= f2
   SystemPar !s1 !s2 -> do
-    f1 <- compileSystem w s1
-    f2 <- compileSystem w s2
-    pure $ \(i1,i2) -> (,) <$> f1 i1 <*> f2 i2
+    f1 <- compileSystem s1 w
+    f2 <- compileSystem s2 w
+    pure $! \(i1,i2) -> (,) <$!> f1 i1 <*> f2 i2
 {-# INLINE compileSystem #-}
 
-compileQuery :: World -> Query IO i a -> IO (i -> Entity -> IO a)
-compileQuery !w q = case q of
+
+
+-- compileSystemTH :: System IO i o -> Code IO (World -> IO (i -> IO o))
+-- compileSystemTH !q !w = case q of
+--   SystemSingle !q !e -> do
+--     cQ <- compileQuery q w
+--     pure $! \i -> cQ i e
+
+-- compileQueryTH :: Query IO i1 a -> (i1 -> IO i2, Code IO (World -> IO (i -> Entity -> IO a)))
+-- compileQueryTH q = case q of
+--   QueryPut @p -> (pure . id, [|| \w -> do
+--     put <- queryPut @(S p) @p w
+--     pure $! \i e -> liftIO $! put e i
+--     ||])
+  -- QueryDelete @d -> [|| \w -> do
+  --   delete <- queryDelete @(S d) @d w
+  --   pure $! \i e -> liftIO $! delete e
+  --   ||]
+
+  -- QueryCompose q1 q2 -> [|| \w -> do
+  --   cQ1 <- $$(compileQueryTH q1) w
+  --   cQ2 <- $$(compileQueryTH q2) w
+  --   pure $! \a e -> cQ1 a e >>= \b -> cQ2 b e
+  --   ||]
+
+  -- QueryMap f -> [|| \w -> pure $! \a e -> (f a) ||] 
+  -- QueryPar q1 q2 -> [|| \w -> do
+  --   cQ1 <- $$(compileQueryTH q1) w
+  --   cQ2 <- $$(compileQueryTH q2) w
+  --   pure $! \(i1,i2) e -> (,) <$!> cQ1 i1 e <*> cQ2 i2 e
+  --   ||]
+
+newtype NewQuery m i a = NewQuery (World -> m (i -> Entity -> m a)) 
+
+newtype System2 m i o = System2 (World -> IO (i -> IO o))
+
+instance Applicative m => Category (System2 m) where
+  id = System2 (\_ -> pure (pure . id))
+  (System2 f1) . (System2 f2) = System2 $ \w -> do
+    f1' <- f1 w
+    f2' <- f2 w
+    pure $ \i -> f2' i >>= f1' 
+
+instance Applicative m => Arrow (System2 m) where
+  arr f = System2 (\_ -> pure (pure . f))
+  (System2 f1) *** (System2 f2) = System2 $ \w -> do
+    f1' <- f1 w
+    f2' <- f2 w
+    pure $ \(i1,i2) -> (,) <$> f1' i1 <*> f2' i2 
+
+compileSystem2 :: System2 IO i o -> World -> IO (i -> IO o)
+compileSystem2 (System2 f) w = f w
+
+
+cmapN :: forall a b m. (QC a, QC b, Applicative m) => (a -> b) -> System2 m () ()
+cmapN f = System2 (\w -> do
+  for <- queryFor @(S a) @a w
+  put <- queryPut @(S b) @b w
+  pure $ \_ -> for $ \e b -> put e (f b)
+  )
+{-# INLINE cmapN #-}
+
+qput :: forall p. QC p => NewQuery IO p ()
+qput = NewQuery $ \w -> do
+    put <- queryPut @(S p) @p w
+    pure $! \i e -> liftIO $! put e i
+
+
+compileQuery :: Query IO i a -> World -> IO (i -> Entity -> IO a)
+compileQuery q !w = case q of
   QueryPut @p -> do
     put <- queryPut @(S p) @p w
-    pure $ \i e -> liftIO $ put e i
+    pure $! \i e -> liftIO $! put e i
   QueryDelete @d -> do
     delete <- queryDelete @(S d) @d w
-    pure $ \i e -> liftIO $ delete e
+    pure $! \i e -> liftIO $! delete e
   QueryCompose q1 q2 -> do
-    cQ1 <- compileQuery w q1
-    cQ2 <- compileQuery w q2
-    pure $ \a e -> cQ1 a e >>= \b -> cQ2 b e
-  QueryMap f -> pure $ \a e -> (f a)
+    cQ1 <- compileQuery q1 w
+    cQ2 <- compileQuery q2 w
+    pure $! \a e -> cQ1 a e >>= \b -> cQ2 b e
+  QueryMap f -> pure $! \a e -> (f a)
   QueryPar q1 q2 -> do
-    cQ1 <- compileQuery w q1
-    cQ2 <- compileQuery w q2
-    pure $ \(i1,i2) e -> (,) <$> cQ1 i1 e <*> cQ2 i2 e
+    cQ1 <- compileQuery q1 w
+    cQ2 <- compileQuery q2 w
+    pure $! \(i1,i2) e -> (,) <$!> cQ1 i1 e <*> cQ2 i2 e
 {-# INLINE compileQuery #-}
+
+
+
 
 cmap :: (QC a, QC b, Applicative m) => (a -> b) -> System m () ()
 cmap f = SystemExec (arr (f . fst) >>> QueryPut)
@@ -154,11 +227,11 @@ cfoldM f = SystemFor (QueryMap (f . fst))
 {-# INLINE cfoldM #-}
 
 cfoldr :: (QC a, MonadIO m) => (a -> b -> b) -> b -> System IO () b
-cfoldr f b = fmap (($ b) . appEndo) $ cfold $ Endo #. f
+cfoldr f b = fmap (($! b) . appEndo) $! cfold $! Endo #. f
 {-# INLINE cfoldr #-}
 
 cfoldl :: (QC a) => (b -> a -> b) -> b -> System IO () b
-cfoldl f b = fmap (($ b) . appEndo . getDual) $ cfold $ Dual . Endo . flip f
+cfoldl f b = fmap (($! b) . appEndo . getDual) $! cfold $! Dual . Endo . flip f
 {-# INLINE cfoldl #-}
 
 -- newEntity' :: MonadIO m => System m Entity
@@ -173,11 +246,10 @@ cfoldl f b = fmap (($ b) . appEndo . getDual) $ cfold $ Dual . Endo . flip f
 --   pure e
 -- {-# INLINE newEntity #-}
 
-
 -- putEntity :: forall a m. (MonadIO m, MPS a) => Entity -> a -> System m ()
 -- putEntity entity a = do
 --   w <- askWorld
---   liftIO $ multiPut @(S a) w entity a
+--   liftIO $! multiPut @(S a) w entity a
 -- {-# INLINE putEntity #-}
 
 -- runSystem :: World -> System m a -> m a
@@ -188,29 +260,6 @@ cfoldl f b = fmap (($ b) . appEndo . getDual) $ cfold $ Dual . Endo . flip f
 -- (#.) :: Coercible b c => (b -> c) -> (a -> b) -> (a -> c)
 -- (#.) _f = coerce
 -- {-# INLINE (#.) #-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 type family S a where
   S () = False
@@ -229,14 +278,14 @@ class QueryComponent (f :: Bool) components where
 type QC (a :: *) = QueryComponent (S a) a
 
 instance QueryComponent False () where
-  queryContains w = pure $ \_ -> pure True
-  queryGet w = pure $ \_ -> pure ()
-  queryPut w = pure $ \_ _ -> pure ()
-  queryDelete w = pure $ \_ -> pure ()
+  queryContains w = pure $! \_ -> pure True
+  queryGet w = pure $! \_ -> pure ()
+  queryPut w = pure $! \_ _ -> pure ()
+  queryDelete w = pure $! \_ -> pure ()
   queryFor w = do
-    pure $ \f -> forEntities (worldEntities w) $ \e -> f e ()
+    pure $! \f -> forEntities (worldEntities w) $! \e -> f e ()
   queryMembers w = do
-    pure $ entityAmount (worldEntities w)
+    pure $! entityAmount (worldEntities w)
     
 
   {-# INLINE queryContains #-}
@@ -261,16 +310,16 @@ instance Component a => QueryComponent True a where
   {-# INLINE queryMembers #-}
 
 instance (QC a, QC b) => QueryComponent False (a, b) where
-  queryContains w = (\p1 p2 e -> (&&) <$> p1 e <*> p2 e) <$> queryContains @(S a) @a w <*> queryContains @(S b) @b w
-  queryGet w = (\f1 f2 e -> (,) <$> f1 e <*> f2 e) <$> queryGet @(S a) @a w <*> queryGet @(S b) @b w
+  queryContains w = (\p1 p2 e -> (&&) <$!> p1 e <*> p2 e) <$!> queryContains @(S a) @a w <*> queryContains @(S b) @b w
+  queryGet w = (\f1 f2 e -> (,) <$!> f1 e <*> f2 e) <$!> queryGet @(S a) @a w <*> queryGet @(S b) @b w
   queryPut w = do
     putA <- queryPut @(S a) w
     putB <- queryPut @(S b) w
-    pure $ \e (a,b) -> putA e a *> putB e b
+    pure $! \e (a,b) -> putA e a *> putB e b
   queryDelete w = do
     deleteA <- queryDelete @(S a) @a w
     deleteB <- queryDelete @(S b) @b w
-    pure $ \e -> deleteA e *> deleteB e
+    pure $! \e -> deleteA e *> deleteB e
   queryFor w = do
     membersA <- queryMembers @(S a) @a w
     membersB <- queryMembers @(S b) @b w
@@ -280,22 +329,22 @@ instance (QC a, QC b) => QueryComponent False (a, b) where
     containsB <- queryContains @(S b) @b w
     getA <- queryGet @(S a) @a w
     getB <- queryGet @(S b) @b w
-    pure $ \f -> do
+    pure $! \f -> do
       amountA <- membersA
       amountB <- membersB
       if amountA > amountB
-        then forB $ \e bs -> do
-          whenIO (containsA e) $ do
+        then forB $! \e bs -> do
+          whenIO (containsA e) $! do
             as <- getA e
             f e (as, bs)
-        else forA $ \e as -> do
-          whenIO (containsA e) $ do
+        else forA $! \e as -> do
+          whenIO (containsA e) $! do
             bs <- getB e
             f e (as, bs)
   queryMembers w = do
     membersA <- queryMembers @(S a) @a w
     membersB <- queryMembers @(S b) @b w
-    pure $ min <$> membersA <*> membersB
+    pure $! min <$!> membersA <*> membersB
   {-# INLINE queryContains #-}
   {-# INLINE queryGet #-}
   {-# INLINE queryPut #-}
@@ -309,22 +358,22 @@ instance (QC a, QC b, QC c) => QueryComponent False (a, b, c) where
     containsA <- queryContains @(S a) @a w
     containsB <- queryContains @(S b) @b w
     containsC <- queryContains @(S c) @c w
-    pure $ \e -> (\a b c -> a && b && c) <$> containsA e <*> containsB e <*> containsC e
+    pure $! \e -> (\a b c -> a && b && c) <$!> containsA e <*> containsB e <*> containsC e
   queryGet w = do
     getA <- queryGet @(S a) w
     getB <- queryGet @(S b) w
     getC <- queryGet @(S c) w
-    pure $ \e -> (,,) <$> getA e <*> getB e <*> getC e
+    pure $! \e -> (,,) <$!> getA e <*> getB e <*> getC e
   queryPut w = do
     putA <- queryPut @(S a) w
     putB <- queryPut @(S b) w
     putC <- queryPut @(S c) w
-    pure $ \e (a,b,c) -> putA e a *> putB e b *> putC e c
+    pure $! \e (a,b,c) -> putA e a *> putB e b *> putC e c
   queryDelete w = do
     deleteA <- queryDelete @(S a) @a w
     deleteB <- queryDelete @(S b) @b w
     deleteC <- queryDelete @(S c) @c w
-    pure $ \e -> deleteA e *> deleteB e *> deleteC e
+    pure $! \e -> deleteA e *> deleteB e *> deleteC e
   queryFor w = do
     membersA <- queryMembers @(S a) @a w
     membersB <- queryMembers @(S b) @b w
@@ -338,36 +387,36 @@ instance (QC a, QC b, QC c) => QueryComponent False (a, b, c) where
     getA <- queryGet @(S a) @a w
     getB <- queryGet @(S b) @b w
     getC <- queryGet @(S c) @c w
-    pure $ \f -> do
+    pure $! \f -> do
       amountA <- membersA
       amountB <- membersB
       amountC <- membersC
       if amountA > amountB
       then
         if amountB > amountC
-          then forC $ \e cs -> do
-            whenIO (containsA e) $
-              whenIO (containsB e) $ do
+          then forC $! \e cs -> do
+            whenIO (containsA e) $!
+              whenIO (containsB e) $! do
                 as <- getA e
                 bs <- getB e
                 f e (as, bs, cs)
-          else forB $ \e bs -> do
-            whenIO (containsA e) $
-              whenIO (containsC e) $ do
+          else forB $! \e bs -> do
+            whenIO (containsA e) $!
+              whenIO (containsC e) $! do
                 as <- getA e
                 cs <- getC e
                 f e (as, bs, cs)
       else
         if amountA > amountC
-          then forC $ \e cs -> do
-            whenIO (containsA e) $
-              whenIO (containsB e) $ do
+          then forC $! \e cs -> do
+            whenIO (containsA e) $!
+              whenIO (containsB e) $! do
                 as <- getA e
                 bs <- getB e
                 f e (as, bs, cs)
-          else forA $ \e as -> do
-            whenIO (containsB e) $
-              whenIO (containsC e) $ do
+          else forA $! \e as -> do
+            whenIO (containsB e) $!
+              whenIO (containsC e) $! do
                 cs <- getC e
                 bs <- getB e
                 f e (as, bs, cs)
@@ -375,7 +424,7 @@ instance (QC a, QC b, QC c) => QueryComponent False (a, b, c) where
     membersA <- queryMembers @(S a) @a w
     membersB <- queryMembers @(S b) @b w
     membersC <- queryMembers @(S c) @c w
-    pure $ (\a b c -> min (min a b) c) <$> membersA <*> membersB <*> membersC
+    pure $! (\a b c -> min (min a b) c) <$!> membersA <*> membersB <*> membersC
   {-# INLINE queryContains #-}
   {-# INLINE queryGet #-}
   {-# INLINE queryPut #-}
@@ -384,8 +433,8 @@ instance (QC a, QC b, QC c) => QueryComponent False (a, b, c) where
   {-# INLINE queryMembers #-}
 
 -- instance (QC a, QC b, QC c) => QueryComponent False (a, b, c) where
---   queryContains w e = (&&) <$> ((&&) <$> queryContains @(S a) @a w e <*> queryContains @(S b) @b w e) <*> queryContains @(S c) @c w e
---   queryGet w e = (,,) <$> queryGet @(S a) @a w e <*> queryGet @(S b) @b w e <*> queryGet @(S c) @c w e
+--   queryContains w e = (&&) <$!> ((&&) <$!> queryContains @(S a) @a w e <*> queryContains @(S b) @b w e) <*> queryContains @(S c) @c w e
+--   queryGet w e = (,,) <$!> queryGet @(S a) @a w e <*> queryGet @(S b) @b w e <*> queryGet @(S c) @c w e
 --   queryPut w e (a, b, c) = queryPut @(S a) w e a *> queryPut @(S b) w e b *> queryPut @(S c) @c w e c
 --   queryDelete w e = queryDelete @(S a) @a w e *> queryDelete @(S b) @b w e *> queryDelete @(S c) @c w e
 --   queryFor w f = do
@@ -395,33 +444,33 @@ instance (QC a, QC b, QC c) => QueryComponent False (a, b, c) where
 --     if amountA > amountB
 --       then
 --         if amountB > amountC
---           then queryFor @(S c) @c w $ \e cs -> do
---             whenIO (queryContains @(S a) @a w e) $
---               whenIO (queryContains @(S b) @b w e) $ do
+--           then queryFor @(S c) @c w $! \e cs -> do
+--             whenIO (queryContains @(S a) @a w e) $!
+--               whenIO (queryContains @(S b) @b w e) $! do
 --                 as <- queryGet @(S a) @a w e
 --                 bs <- queryGet @(S b) @b w e
 --                 f e (as, bs, cs)
---           else queryFor @(S b) @b w $ \e bs -> do
---             whenIO (queryContains @(S a) @a w e) $
---               whenIO (queryContains @(S c) @c w e) $ do
+--           else queryFor @(S b) @b w $! \e bs -> do
+--             whenIO (queryContains @(S a) @a w e) $!
+--               whenIO (queryContains @(S c) @c w e) $! do
 --                 as <- queryGet @(S a) @a w e
 --                 cs <- queryGet @(S c) @c w e
 --                 f e (as, bs, cs)
 --       else
 --         if amountA > amountC
---           then queryFor @(S c) @c w $ \e cs -> do
---             whenIO (queryContains @(S a) @a w e) $
---               whenIO (queryContains @(S b) @b w e) $ do
+--           then queryFor @(S c) @c w $! \e cs -> do
+--             whenIO (queryContains @(S a) @a w e) $!
+--               whenIO (queryContains @(S b) @b w e) $! do
 --                 as <- queryGet @(S a) @a w e
 --                 bs <- queryGet @(S b) @b w e
 --                 f e (as, bs, cs)
---           else queryFor @(S a) @a w $ \e as -> do
---             whenIO (queryContains @(S b) @b w e) $
---               whenIO (queryContains @(S c) @c w e) $ do
+--           else queryFor @(S a) @a w $! \e as -> do
+--             whenIO (queryContains @(S b) @b w e) $!
+--               whenIO (queryContains @(S c) @c w e) $! do
 --                 cs <- queryGet @(S c) @c w e
 --                 bs <- queryGet @(S b) @b w e
 --                 f e (as, bs, cs)
---   queryMembers w = min <$> (min <$> queryMembers @(S a) @a w <*> queryMembers @(S b) @b w) <*> queryMembers @(S c) @c w
+--   queryMembers w = min <$!> (min <$!> queryMembers @(S a) @a w <*> queryMembers @(S b) @b w) <*> queryMembers @(S c) @c w
 --   {-# INLINE queryContains #-}
 --   {-# INLINE queryGet #-}
 --   {-# INLINE queryPut #-}

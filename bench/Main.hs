@@ -10,7 +10,7 @@ import Hex.Internal.Component
 import Hex.Internal.Component.ComponentId
 import Hex.Internal.Component.SparseSet
 import Hex.Internal.Entity (Entity (..), MaxEntities (MaxEntities))
-import Hex.Internal.NewQuery
+import Hex.Internal.NewSystem
 import Hex.Internal.World
 import GHC.Generics (Generic)
 import Foreign.Storable.Generic (GStorable)
@@ -45,7 +45,7 @@ main = do
   -- runSystem world testHex2
   -- pure ()
   world <- physicsWorld
-  run <- compileSystem world physics
+  run <- compileSystem physics world
   defaultMain $ 
     [ bench "simple physics (3 components)" $ whnfIO $ run ()
     ]
@@ -54,10 +54,13 @@ physicsWorld :: IO World
 physicsWorld = do
   world <- newWorld 10000
   worldComponent @Position world
+  worldComponent @Velocity world
+  worldComponent @Acceleration world
 
-  make <- compileSystem world $ SystemNewEntity
+
+  make <- compileSystem newEntity world
   
-  forM_ [0..2000] $ \i ->
+  forM_ [0..1000] $ \i ->
     make (Position 0 i, Velocity 0 0, Acceleration 1 0)
   
   pure world
@@ -66,8 +69,8 @@ physics :: System IO () ()
 physics = foldl (>>>) sys $ const sys <$> [1..500]
   where sys = 
           cmap (\(Velocity vx vy, Acceleration ax ay) -> Velocity (vx + ax) (vy + ay)) >>>
-          cmap (\(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy)) >>>
-          cfoldl (\s (Position x y) -> s + x + y) (0 :: Int) >>> pure ()
+          cmap (\(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy))
+          >>> cfoldl (\s (Position x y) -> s + x + y) (0 :: Int) >>> pure ()
             -- *> cmapM (\(Position x y) -> print y)
           -- >>> SystemMap (liftIO . print)
             
