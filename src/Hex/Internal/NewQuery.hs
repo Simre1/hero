@@ -12,45 +12,66 @@ import Hex.Internal.Entity
 import Hex.Internal.World
 import Control.Category
 import Control.Arrow
-import Prelude hiding ((.))
+import Prelude hiding ((.), id)
 import Data.Functor
+import Data.Coerce
+import Data.Monoid
 
 
 data Query m i o where
   QueryPut :: QC a => Query m a ()
   QueryDelete :: QC a => Query m a ()
-  QueryConnect :: Query m a b -> Query m b c -> Query m a c
+  QueryCompose :: Query m a b -> Query m b c -> Query m a c
   QueryMap :: (a -> m b) -> Query m a b
   QueryPar :: Query m i1 o1 -> Query m i2 o2 -> Query m (i1,i2) (o1,o2)
+
+instance Applicative m => Category (Query m) where
+  id = QueryMap pure
+  (.) = flip QueryCompose
+
+instance Applicative m => Arrow (Query m) where
+  arr f = QueryMap (pure . f)
+  (***) = QueryPar
 
 data System m i o where
   SystemExec :: QC i1 => Query m (i1, i2) () -> System m i2 ()
   SystemSingle :: Query m i o -> Entity -> System m i o
   SystemFor :: (QC i1, Monoid o) => Query m (i1,i2) o -> System m i2 o
   SystemNewEntity :: QC c => System m c Entity
+  SystemMap :: (i -> m o) -> System m i o
+  SystemSeq :: System m a b -> System m b c -> System m a c
+  SystemPar :: System m a1 b1 -> System m a2 b2 -> System m (a1,a2) (b1,b2)
 
-instance Applicative m => Category (Query m) where
-  id = QueryMap pure
-  (.) = flip QueryConnect
+instance Applicative m => Functor (System m i) where
+  fmap f !s = SystemSeq s (SystemMap $ pure . f)
 
-instance Applicative m => Arrow (Query m) where
-  arr f = QueryMap (pure . f)
-  (***) = QueryPar
+instance Applicative m => Applicative (System m i) where
+  pure a = SystemMap $ \_ -> pure a
+  !s1 <*> !s2 = SystemSeq (SystemSeq (SystemMap (\a -> pure (a,a))) 
+    (SystemPar s1 s2)) (SystemMap (\(f,a) -> pure $ f a) )
 
-newtype CompiledQuery m i a = CompiledQuery (i -> m a)
+instance Applicative m => Category (System m) where
+  id = SystemMap (pure . id)
+  !s1 . !s2 = SystemSeq s2 s1
+
+instance Applicative m => Arrow (System m) where
+  arr f = SystemMap (pure . f)
+  !s1 *** !s2 = SystemPar s1 s2
+
+-- newtype CompiledQuery m i a = CompiledQuery (i -> Entity -> m a)
 
 data QueryContext = QueryContext ()
 
-compileSystem :: World -> System IO i a -> IO (i -> IO a)
-compileSystem w q = case q of
-  SystemExec @i1 q -> do
+compileSystem :: World -> System IO i o -> IO (i -> IO o)
+compileSystem !w q = case q of
+  SystemExec @i1 !q -> do
     cQ <- compileQuery w q
     for <- queryFor @(S i1) @i1 w
     pure $ \i2 -> for $ \e i1 -> cQ (i1,i2) e
-  SystemSingle q e -> do
+  SystemSingle !q !e -> do
     cQ <- compileQuery w q
     pure $ \i -> cQ i e
-  SystemFor @i1 @o q -> do
+  SystemFor @i1 @o !q -> do
     cQ <- compileQuery w q
     for <- queryFor @(S i1) @i1 w
     pure $ \i2 -> do
@@ -65,17 +86,26 @@ compileSystem w q = case q of
       e <- worldNewEntity w
       put e c
       pure e
+  SystemMap !f -> pure f
+  SystemSeq !s1 !s2 -> do
+    f1 <- compileSystem w s1
+    f2 <- compileSystem w s2
+    pure $ \i -> f1 i >>= f2
+  SystemPar !s1 !s2 -> do
+    f1 <- compileSystem w s1
+    f2 <- compileSystem w s2
+    pure $ \(i1,i2) -> (,) <$> f1 i1 <*> f2 i2
 {-# INLINE compileSystem #-}
 
 compileQuery :: World -> Query IO i a -> IO (i -> Entity -> IO a)
-compileQuery w q = case q of
+compileQuery !w q = case q of
   QueryPut @p -> do
     put <- queryPut @(S p) @p w
     pure $ \i e -> liftIO $ put e i
   QueryDelete @d -> do
     delete <- queryDelete @(S d) @d w
     pure $ \i e -> liftIO $ delete e
-  QueryConnect q1 q2 -> do
+  QueryCompose q1 q2 -> do
     cQ1 <- compileQuery w q1
     cQ2 <- compileQuery w q2
     pure $ \a e -> cQ1 a e >>= \b -> cQ2 b e
@@ -89,6 +119,74 @@ compileQuery w q = case q of
 cmap :: (QC a, QC b, Applicative m) => (a -> b) -> System m () ()
 cmap f = SystemExec (arr (f . fst) >>> QueryPut)
 {-# INLINE cmap #-}
+
+cmapM :: (QC a, QC b) => (a -> IO b) -> System IO () ()
+cmapM f = SystemExec (QueryMap (f . fst) >>> QueryPut)
+
+cfold :: (Monoid o, QC a, MonadIO m) => (a -> o) -> System m () o
+cfold f = SystemFor (QueryMap (pure . f . fst))
+
+cfoldM :: (Monoid o, QC a) => (a -> IO o) -> System IO i o
+cfoldM f = SystemFor (QueryMap (f . fst))
+
+cfoldr :: (QC a, MonadIO m) => (a -> b -> b) -> b -> System IO () b
+cfoldr f b = fmap (($ b) . appEndo) $ cfold $ Endo #. f
+{-# INLINE cfoldr #-}
+
+cfoldl :: (QC a) => (b -> a -> b) -> b -> System IO () b
+cfoldl f b = fmap (($ b) . appEndo . getDual) $ cfold $ Dual . Endo . flip f
+{-# INLINE cfoldl #-}
+
+-- newEntity' :: MonadIO m => System m Entity
+-- newEntity' = askWorld >>= liftIO . worldNewEntity
+-- {-# INLINE newEntity' #-}
+
+
+-- newEntity :: (MPS a, MonadIO m) => a -> System m Entity
+-- newEntity a = do
+--   e <- newEntity' 
+--   putEntity e a
+--   pure e
+-- {-# INLINE newEntity #-}
+
+
+-- putEntity :: forall a m. (MonadIO m, MPS a) => Entity -> a -> System m ()
+-- putEntity entity a = do
+--   w <- askWorld
+--   liftIO $ multiPut @(S a) w entity a
+-- {-# INLINE putEntity #-}
+
+-- runSystem :: World -> System m a -> m a
+-- runSystem w (System r) = runReaderT r w
+-- {-# INLINE runSystem #-}
+
+-- -- See Data.Foldable
+-- (#.) :: Coercible b c => (b -> c) -> (a -> b) -> (a -> c)
+-- (#.) _f = coerce
+-- {-# INLINE (#.) #-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 type family S a where
   S () = False
@@ -310,3 +408,7 @@ whenIO :: IO Bool -> IO () -> IO ()
 whenIO action f = do
   b <- action
   when b f
+
+(#.) :: Coercible b c => (b -> c) -> (a -> b) -> (a -> c)
+(#.) _f = coerce
+{-# INLINE (#.) #-}

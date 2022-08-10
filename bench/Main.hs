@@ -15,8 +15,9 @@ import Hex.Internal.World
 import GHC.Generics (Generic)
 import Foreign.Storable.Generic (GStorable)
 import Data.Data
-import Gauge
+import Test.Tasty.Bench
 import Data.Functor
+import Control.Arrow
 
 data Position = Position Int Int deriving (Generic)
 
@@ -50,9 +51,9 @@ main = do
   -- runSystem world testHex2
   -- pure ()
   world <- physicsWorld
-  run <- compileSystem world physics <&> \action -> forM_ [0..2000] (\_ -> action ())
+  run <- compileSystem world physics
   defaultMain $ 
-    [ bench "simple physics (3 components)" $ whnfIO $ run
+    [ bench "simple physics (3 components)" $ whnfIO $ run ()
     ]
 
 physicsWorld :: IO World
@@ -63,12 +64,16 @@ physicsWorld = do
   make <- compileSystem world $ SystemNewEntity
   
   forM_ [0..2000] $ \i ->
-    make (Position 0 i)
+    make (Position 0 i, Velocity 0 0, Acceleration 1 0)
   
   pure world
 
 physics :: System IO () ()
-physics = do
-    cmap $ \(Position x y) -> (Position (x+1) (y+1))
-    -- cMap $ \(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy)
-    -- cFoldl (\s (Position x y) -> s + x + y) (0 :: Int)
+physics = foldl (*>) sys $ const sys <$> [1..500]
+  where sys = 
+          cmap (\(Velocity vx vy, Acceleration ax ay) -> Velocity (vx + ax) (vy + ay)) *>
+          cmap (\(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy)) *>
+          cfoldl (\s (Position x y) -> s + x + y) (0 :: Int) *> pure ()
+            -- *> cmapM (\(Position x y) -> print y)
+          -- >>> SystemMap (liftIO . print)
+            

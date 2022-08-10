@@ -54,7 +54,7 @@ test-suite ecs
 
 executable bench
     main-is: Main.hs
-    build-depends:    base >4.13.0.0, ecs, gauge, transformers, derive-storable, derive-storable-plugin
+    build-depends:    base >4.13.0.0, ecs, tasty, tasty-bench, transformers, derive-storable, derive-storable-plugin
     hs-source-dirs:   bench
     default-language: GHC2021
     ghc-options: -O2

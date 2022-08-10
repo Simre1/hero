@@ -40,6 +40,7 @@ create sparseSize denseSize = do
 
 insert :: (VM.Storable a) => SparseSetStorable a -> Word32 -> a -> IO ()
 insert set@(SparseSetStorable sparse entitiesRef denseRef sizeRef) i a = do
+  
   index <- VPM.unsafeRead sparse (fromIntegral i)
   dense <- readIORef denseRef
   if index /= maxBound
@@ -116,6 +117,7 @@ for (SparseSetStorable _ entitiesRef denseRef sizeRef) f = do
   forM_ [0 .. pred size] $ \i -> do
     key <- liftIO $ VPM.unsafeRead entities i
     val <- liftIO $ VM.unsafeRead dense i
+
     f key val
 {-# INLINE for #-}
 

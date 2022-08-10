@@ -9,15 +9,16 @@ module Hex.Internal.Component where
 import Control.Monad.IO.Class
 import Data.IORef
 -- import Data.Map.Strict qualified as M
+
+import Data.Map qualified as M
 import Data.Proxy
 import Data.Vector.Mutable qualified as V
 import Hex.Internal.Component.ComponentId
 import Hex.Internal.Entity
 import Type.Reflection
 import Unsafe.Coerce
-import qualified Data.Map as M
 
-newtype ComponentId = ComponentId {unwrapComponentId :: Int}
+newtype ComponentId = ComponentId {unwrapComponentId :: Int} deriving (Show)
 
 class ComponentAmount where
   componentAmount :: Int
@@ -47,8 +48,9 @@ data Stores = Stores (IORef (V.IOVector WrappedStorage)) (IORef (M.Map SomeTypeR
 addStore :: forall component. Component component => Stores -> Store component -> IO ComponentId
 addStore (Stores storeVecRef mappingsRef) store = do
   mappings <- readIORef mappingsRef
-  storeVec <- readIORef storeVecRef 
-  let maybeMapping = M.lookup (someTypeRep $ Proxy @component) mappings
+  storeVec <- readIORef storeVecRef
+  let rep = someTypeRep $ Proxy @component
+      maybeMapping = M.lookup rep mappings
       wrappedStore = (WrappedStorage $ unsafeCoerce store)
   case maybeMapping of
     Nothing -> do
@@ -56,10 +58,13 @@ addStore (Stores storeVecRef mappingsRef) store = do
           storeSize = V.length storeVec
       if newId < storeSize
         then V.unsafeWrite storeVec newId wrappedStore
-        else V.grow storeVec (storeSize `quot` 2) >> V.unsafeWrite storeVec newId wrappedStore
+        else do
+          newStoreVec <- V.grow storeVec (storeSize `quot` 2)
+          V.unsafeWrite newStoreVec newId wrappedStore
+          writeIORef storeVecRef newStoreVec
+      modifyIORef mappingsRef $ M.insert rep (ComponentId newId)
       pure $ ComponentId newId
     Just i -> V.unsafeWrite storeVec (unwrapComponentId i) wrappedStore *> pure i
-    
 
 addComponentStore :: forall component. (Component component) => Stores -> MaxEntities -> IO ComponentId
 addComponentStore stores@(Stores storeVec mappings) max = do
@@ -71,7 +76,7 @@ getStore (Stores storeVecRef _) componentId =
   readIORef storeVecRef >>= \vec -> unwrapWrappedStorage <$> V.unsafeRead vec (unwrapComponentId componentId)
 
 getComponentId :: forall component. Component component => Stores -> MaxEntities -> IO ComponentId
-getComponentId stores@(Stores  _ mappingsRef) max = do
+getComponentId stores@(Stores _ mappingsRef) max = do
   maybeComponent <- M.lookup (someTypeRep $ Proxy @component) <$> readIORef mappingsRef
   case maybeComponent of
     Just componentId -> pure componentId
