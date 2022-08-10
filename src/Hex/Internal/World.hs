@@ -11,20 +11,20 @@ data World = World
     worldMaxEntities :: {-# UNPACK #-} !MaxEntities
   }
 
-newWorld :: ComponentAmount => Word32 -> IO World
+newWorld :: Word32 -> IO World
 newWorld !max = do
   let maxEnts = MaxEntities max
   !stores <- newStores
   !entities <- newEntities maxEnts
   pure $ World stores entities maxEnts
 
-worldComponentStorage :: Component component => World -> IO (Store component)
-worldComponentStorage !w = getComponentStorage (worldStores w) (worldMaxEntities w)
-{-# INLINE worldComponentStorage #-}
+worldComponentId :: forall component. Component component => Component component => World -> IO ComponentId
+worldComponentId !w = getComponentId @component (worldStores w) (worldMaxEntities w)
+{-# INLINE worldComponentId #-}
 
-worldAddComponentStorage :: forall component. Component component => World -> IO ()
-worldAddComponentStorage !w = addComponentStorage @component (worldStores w) (worldMaxEntities w)
-{-# INLINE worldAddComponentStorage #-}
+worldComponent :: forall component. Component component => Component component => World -> IO (Store component)
+worldComponent !w = getComponentId @component (worldStores w) (worldMaxEntities w) >>= getStore (worldStores w)
+{-# INLINE worldComponent #-}
 
 worldNewEntity :: World -> IO Entity
 worldNewEntity !world = newEntity (worldMaxEntities world) (worldEntities world)

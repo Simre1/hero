@@ -11,21 +11,25 @@ import Data.IORef
 -- import Data.Map.Strict qualified as M
 import Data.Proxy
 import Data.Vector.Mutable qualified as V
-import GHC.IO
 import Hex.Internal.Component.ComponentId
 import Hex.Internal.Entity
-import Language.Haskell.TH
 import Type.Reflection
 import Unsafe.Coerce
+import qualified Data.Map as M
+
+newtype ComponentId = ComponentId {unwrapComponentId :: Int}
 
 class ComponentAmount where
   componentAmount :: Int
 
-class Component component where
+class Typeable component => Component component where
   componentStorage :: MaxEntities -> IO (Store component)
   componentId :: Int
 
 newtype WrappedStorage = WrappedStorage (forall component. Store component)
+
+unwrapWrappedStorage :: WrappedStorage -> Store component
+unwrapWrappedStorage (WrappedStorage s) = s
 
 class StoreClass store component where
   storeClassContains :: store component -> Entity -> IO Bool
@@ -38,35 +42,46 @@ class StoreClass store component where
 data Store component where
   Store :: StoreClass store component => store component -> Store component
 
--- newtype Stores = Stores (H.BasicHashTable SomeTypeRep WrappedStorage)
+data Stores = Stores (IORef (V.IOVector WrappedStorage)) (IORef (M.Map SomeTypeRep ComponentId))
 
-newtype Stores = Stores (V.IOVector WrappedStorage)
-
-addStorage :: forall component. Component component => Stores -> Store component -> IO ()
-addStorage (Stores ref) store =
-  let id = componentId @component
-   in V.unsafeWrite ref id (WrappedStorage $ unsafeCoerce store)
-
-addComponentStorage :: forall component. (Component component) => Stores -> MaxEntities -> IO ()
-addComponentStorage stores@(Stores mapRef) max = do
-  store <- componentStorage @component max
-  addStorage stores store
-
-getStorage :: forall component. Component component => Stores -> IO (Maybe (Store component))
-getStorage (Stores ref) = unsafeCoerce <$> V.readMaybe ref (componentId @component)
-
-getComponentStorage :: forall component. (Component component) => Stores -> MaxEntities -> IO (Store component)
-getComponentStorage stores@(Stores ref) max = do
-  maybeStorage <- getStorage stores
-  case maybeStorage of
-    Just store -> pure store
+addStore :: forall component. Component component => Stores -> Store component -> IO ComponentId
+addStore (Stores storeVecRef mappingsRef) store = do
+  mappings <- readIORef mappingsRef
+  storeVec <- readIORef storeVecRef 
+  let maybeMapping = M.lookup (someTypeRep $ Proxy @component) mappings
+      wrappedStore = (WrappedStorage $ unsafeCoerce store)
+  case maybeMapping of
     Nothing -> do
-      store <- componentStorage max
-      addStorage stores store
-      pure store
+      let newId = M.size mappings
+          storeSize = V.length storeVec
+      if newId < storeSize
+        then V.unsafeWrite storeVec newId wrappedStore
+        else V.grow storeVec (storeSize `quot` 2) >> V.unsafeWrite storeVec newId wrappedStore
+      pure $ ComponentId newId
+    Just i -> V.unsafeWrite storeVec (unwrapComponentId i) wrappedStore *> pure i
+    
 
-newStores :: ComponentAmount => IO Stores
-newStores = Stores <$> V.new componentAmount
+addComponentStore :: forall component. (Component component) => Stores -> MaxEntities -> IO ComponentId
+addComponentStore stores@(Stores storeVec mappings) max = do
+  store <- componentStorage @component max
+  addStore stores store
+
+getStore :: Stores -> ComponentId -> IO (Store component)
+getStore (Stores storeVecRef _) componentId =
+  readIORef storeVecRef >>= \vec -> unwrapWrappedStorage <$> V.unsafeRead vec (unwrapComponentId componentId)
+
+getComponentId :: forall component. Component component => Stores -> MaxEntities -> IO ComponentId
+getComponentId stores@(Stores  _ mappingsRef) max = do
+  maybeComponent <- M.lookup (someTypeRep $ Proxy @component) <$> readIORef mappingsRef
+  case maybeComponent of
+    Just componentId -> pure componentId
+    Nothing -> do
+      store <- componentStorage @component max
+      componentId <- addStore stores store
+      pure componentId
+
+newStores :: IO Stores
+newStores = Stores <$> (V.new 10 >>= newIORef) <*> newIORef M.empty
 
 storeContains :: forall component. Store component -> Entity -> IO Bool
 storeGet :: forall component. Store component -> Entity -> IO component
