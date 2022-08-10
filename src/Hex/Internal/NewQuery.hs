@@ -17,17 +17,17 @@ import Data.Functor
 
 
 data Query m i o where
-  QueryPut :: Component a => Query m a ()
-  QueryDelete :: Component a => Query m a ()
+  QueryPut :: QC a => Query m a ()
+  QueryDelete :: QC a => Query m a ()
   QueryConnect :: Query m a b -> Query m b c -> Query m a c
   QueryMap :: (a -> m b) -> Query m a b
   QueryPar :: Query m i1 o1 -> Query m i2 o2 -> Query m (i1,i2) (o1,o2)
 
 data System m i o where
-  SystemExec :: Component i1 => Query m (i1, i2) () -> System m i2 ()
+  SystemExec :: QC i1 => Query m (i1, i2) () -> System m i2 ()
   SystemSingle :: Query m i o -> Entity -> System m i o
-  SystemFor :: (Component i1, Monoid o) => Query m (i1,i2) o -> System m i2 o
-  SystemNewEntity :: Component c => System m c Entity
+  SystemFor :: (QC i1, Monoid o) => Query m (i1,i2) o -> System m i2 o
+  SystemNewEntity :: QC c => System m c Entity
 
 instance Applicative m => Category (Query m) where
   id = QueryMap pure
@@ -45,36 +45,36 @@ compileSystem :: World -> System IO i a -> IO (i -> IO a)
 compileSystem w q = case q of
   SystemExec @i1 q -> do
     cQ <- compileQuery w q
-    store <- worldComponent @i1 w
-    pure $ \i2 -> storeFor store $ \e i1 -> cQ (i1,i2) e
+    for <- queryFor @(S i1) @i1 w
+    pure $ \i2 -> for $ \e i1 -> cQ (i1,i2) e
   SystemSingle q e -> do
     cQ <- compileQuery w q
     pure $ \i -> cQ i e
   SystemFor @i1 @o q -> do
     cQ <- compileQuery w q
-    store <- worldComponent @i1 w
+    for <- queryFor @(S i1) @i1 w
     pure $ \i2 -> do
       ref <- newIORef (mempty :: o)
-      storeFor store $ \e i1 -> do
+      for $ \e i1 -> do
         o <- cQ (i1,i2) e
         modifyIORef ref (<> o)
       readIORef ref
   SystemNewEntity @c -> do
-    store <- worldComponent @c w
+    put <- queryPut @(S c) @c w
     pure $ \c -> do
       e <- worldNewEntity w
-      storePut store e c
+      put e c
       pure e
 {-# INLINE compileSystem #-}
 
 compileQuery :: World -> Query IO i a -> IO (i -> Entity -> IO a)
 compileQuery w q = case q of
   QueryPut @p -> do
-    store <- worldComponent @p w
-    pure $ \i e -> liftIO $ storePut store e i
+    put <- queryPut @(S p) @p w
+    pure $ \i e -> liftIO $ put e i
   QueryDelete @d -> do
-    store <- worldComponent @d w
-    pure $ \i e -> liftIO $ storeDelete store e
+    delete <- queryDelete @(S d) @d w
+    pure $ \i e -> liftIO $ delete e
   QueryConnect q1 q2 -> do
     cQ1 <- compileQuery w q1
     cQ2 <- compileQuery w q2
@@ -86,7 +86,7 @@ compileQuery w q = case q of
     pure $ \(i1,i2) e -> (,) <$> cQ1 i1 e <*> cQ2 i2 e
 {-# INLINE compileQuery #-}
 
-cmap :: (Component a, Component b, Applicative m) => (a -> b) -> System m () ()
+cmap :: (QC a, QC b, Applicative m) => (a -> b) -> System m () ()
 cmap f = SystemExec (arr (f . fst) >>> QueryPut)
 {-# INLINE cmap #-}
 
@@ -104,23 +104,25 @@ class QueryComponent (f :: Bool) components where
   queryFor :: World -> IO ((Entity -> components -> IO ()) -> IO ())
   queryMembers :: World -> IO (IO Int)
 
-type QC a = QueryComponent (S a) a
+type QC (a :: *) = QueryComponent (S a) a
 
--- type S a = SingleComponent a
+instance QueryComponent False () where
+  queryContains w = pure $ \_ -> pure True
+  queryGet w = pure $ \_ -> pure ()
+  queryPut w = pure $ \_ _ -> pure ()
+  queryDelete w = pure $ \_ -> pure ()
+  queryFor w = do
+    pure $ \f -> forEntities (worldEntities w) $ \e -> f e ()
+  queryMembers w = do
+    pure $ entityAmount (worldEntities w)
+    
 
--- instance QueryComponent False () where
---   queryContains w = pure $ \_ -> pure True
---   queryGet w = pure $ \_ -> pure ()
---   queryPut w = pure $ \_ _ -> pure ()
---   queryDelete w = pure $ \_ -> pure ()
---   queryFor w = pure $ \_ -> pure ()
---   queryMembers w = pure $ 
---   {-# INLINE queryContains #-}
---   {-# INLINE queryGet #-}
---   {-# INLINE queryPut #-}
---   {-# INLINE queryDelete #-}
---   {-# INLINE queryFor #-}
---   {-# INLINE queryMembers #-}
+  {-# INLINE queryContains #-}
+  {-# INLINE queryGet #-}
+  {-# INLINE queryPut #-}
+  {-# INLINE queryDelete #-}
+  {-# INLINE queryFor #-}
+  {-# INLINE queryMembers #-}
 
 instance Component a => QueryComponent True a where
   queryContains w = worldComponent @a w <&> \s e -> storeContains s e

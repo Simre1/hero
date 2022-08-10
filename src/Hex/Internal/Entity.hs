@@ -42,3 +42,8 @@ removeEntity (Entities entities _) (Entity key) = S.remove entities key
 forEntities :: Entities -> (Entity -> IO ()) -> IO ()
 forEntities (Entities entities _) f = S.for entities (coerce f)
 {-# INLINE forEntities #-}
+
+entityAmount :: Entities -> IO Int
+entityAmount (Entities entities _) = S.size entities
+{-# INLINE entityAmount #-}
+
