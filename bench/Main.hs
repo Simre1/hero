@@ -16,6 +16,7 @@ import GHC.Generics (Generic)
 import Foreign.Storable.Generic (GStorable)
 import Data.Data
 import Gauge
+import Data.Functor
 
 data Position = Position Int Int deriving (Generic)
 
@@ -49,9 +50,9 @@ main = do
   -- runSystem world testHex2
   -- pure ()
   world <- physicsWorld
-  run <- compileSystem world physics
+  run <- compileSystem world physics <&> \action -> forM_ [0..2000] (\_ -> action ())
   defaultMain $ 
-    [ bench "simple physics (3 components)" $ whnfIO $ forM_ [0..2000] (const $ run ())
+    [ bench "simple physics (3 components)" $ whnfIO $ run
     ]
 
 physicsWorld :: IO World
