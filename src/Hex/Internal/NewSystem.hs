@@ -54,6 +54,9 @@ instance Applicative m => Category (System m) where
     f1' <- f1 w
     f2' <- f2 w
     pure $ \i -> f2' i >>= f1'
+  {-# INLINE id #-}
+  {-# INLINE (.) #-}
+
 
 instance Applicative m => Arrow (System m) where
   arr f = System (\_ -> pure (pure . f))
@@ -61,11 +64,15 @@ instance Applicative m => Arrow (System m) where
     f1' <- f1 w
     f2' <- f2 w
     pure $ \(i1, i2) -> (,) <$> f1' i1 <*> f2' i2
+  {-# INLINE arr #-}
+  {-# INLINE (***) #-}
+
 
 instance Applicative m => Functor (System m i) where
   fmap f (System makeQ) = System $ \w -> do
     q <- makeQ w
     pure $ \i -> fmap f (q i)
+  {-# INLINE fmap #-}
 
 instance Applicative m => Applicative (System m i) where
   pure a = System $ \_ -> pure $ \_ -> pure a
@@ -73,6 +80,9 @@ instance Applicative m => Applicative (System m i) where
     f <- makeQF w
     v <- makeQV w
     pure $ \i -> f i <*> v i
+  {-# INLINE pure #-}
+  {-# INLINE (<*>) #-}
+
 
 compileSystem :: System IO i o -> World -> IO (i -> IO o)
 compileSystem (System f) w = f w
@@ -85,7 +95,6 @@ cmap f =
         put <- queryPut @(S b) @b w
         pure $ \_ -> for $ \e a -> put e (f a)
     )
-{-# INLINE cmap #-}
 
 cmapM :: forall a b m. (QC a, QC b) => (a -> IO b) -> System IO () ()
 cmapM f =
@@ -95,7 +104,6 @@ cmapM f =
         put <- queryPut @(S b) @b w
         pure $ \_ -> for $ \e a -> f a >>= put e
     )
-{-# INLINE cmapM #-}
 
 cfold :: forall a o m. (Monoid o, QC a) => (a -> o) -> System IO () o
 cfold f = System $ \w -> do
@@ -106,7 +114,6 @@ cfold f = System $ \w -> do
       let o = f a
       modifyIORef ref (<> o)
     readIORef ref
-{-# INLINE cfold #-}
 
 cfoldM :: forall a o m. (Monoid o, QC a) => (a -> IO o) -> System IO () o
 cfoldM f = System $ \w -> do
@@ -117,7 +124,6 @@ cfoldM f = System $ \w -> do
       o <- f a
       modifyIORef ref (<> o)
     readIORef ref
-{-# INLINE cfoldM #-}
 
 cfoldr :: (QC a) => (a -> b -> b) -> b -> System IO () b
 cfoldr f b = fmap (($! b) . appEndo) $! cfold $! Endo #. f
@@ -134,6 +140,7 @@ newEntity = System $ \w -> do
     e <- worldNewEntity w
     put e c
     pure e
+
 
 type family S a where
   S () = False
