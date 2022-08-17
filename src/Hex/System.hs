@@ -142,14 +142,22 @@ cfoldM f = System $ \w -> do
 
 -- | Iterates over all entities with the requested components and folds the components.
 -- The order of getting the components, so there is no real difference between cfoldr and cfoldl.
+-- cfoldr is strict and early return is not possible.
 cfoldr :: (QCI a, MonadIO m) => (a -> b -> b) -> b -> System m () b
-cfoldr f b = fmap (($! b) . appEndo) $! cfold $! Endo #. f
+cfoldr f = cfoldl (flip f)
 {-# INLINE cfoldr #-}
 
 -- | Iterates over all entities with the requested components and folds the components.
 -- The order of getting the components, so there is no real difference between cfoldr and cfoldl.
-cfoldl :: (QCI a, MonadIO m) => (b -> a -> b) -> b -> System m () b
-cfoldl f b = fmap (($! b) . appEndo . getDual) $! cfold $! Dual . Endo . flip f
+-- cfoldl is strict and early return is not possible.
+cfoldl :: forall a b m. (QCI a, MonadIO m) => (b -> a -> b) -> b -> System m () b
+cfoldl f b = System $ \w -> do
+  for <- queryFor @(S a) @a w
+  pure $! \i2 -> do
+    ref <- liftIO $ newIORef b
+    for $! \e a -> do
+      liftIO $ modifyIORef' ref $ \b -> f b a
+    liftIO $ readIORef ref
 {-# INLINE cfoldl #-}
 
 -- | Creates a new entity with the given components

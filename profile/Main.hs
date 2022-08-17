@@ -15,26 +15,26 @@ import GHC.Generics (Generic)
 import Foreign.Storable.Generic (GStorable)
 import Control.Arrow
 
-data Position = Position Int Int deriving (Generic)
+data Position = Position {-# UNPACK #-} !Int {-# UNPACK #-} !Int deriving (Generic)
 
 instance GStorable Position
 
-data Velocity = Velocity Int Int deriving (Generic)
+data Velocity = Velocity {-# UNPACK #-} !Int {-# UNPACK #-} !Int deriving (Generic)
 
 instance GStorable Velocity
 
-data Acceleration = Acceleration Int Int deriving (Generic)
+data Acceleration = Acceleration {-# UNPACK #-} !Int {-# UNPACK #-} !Int deriving (Generic)
 
 instance GStorable Acceleration
 
 instance Component Position where
-  componentStorage = storedSet
+  type Store Position = SparseSetStorableStore
 
 instance Component Velocity where
-  componentStorage = storedSet
+  type Store Velocity = SparseSetStorableStore
 
 instance Component Acceleration where
-  componentStorage = storedSet
+  type Store Acceleration = SparseSetStorableStore
 
 main :: IO ()
 main = do
@@ -54,11 +54,8 @@ physicsWorld = do
   pure world
 
 physics :: System IO () ()
-physics = foldl (*>) sys $ const sys <$> [1..500]
+physics = foldl (*>) sys $ const sys <$> [1..300]
   where sys = 
           cmap (\(Velocity vx vy, Acceleration ax ay) -> Velocity (vx + ax) (vy + ay)) *>
           cmap (\(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy))
           *> cfoldl (\s (Position x y) -> s + x + y) (0 :: Int) *> pure ()
-            -- *> cmapM (\(Position x y) -> print y)
-          -- >>> SystemMap (liftIO . print)
-            
