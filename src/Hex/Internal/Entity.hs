@@ -23,6 +23,7 @@ newEntity (MaxEntities max) (Entities entities lastIdRef) = do
   lastId <- readIORef lastIdRef
   nextId <- findNext lastId 1
   writeIORef lastIdRef nextId
+  S.insert entities nextId
   pure $ Entity nextId
   where
     findNext last distance = do
