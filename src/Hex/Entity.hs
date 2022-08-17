@@ -5,6 +5,7 @@ import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.SparseSet.NoComponent qualified as S
 import Data.Vector.Unboxed.Mutable qualified as VU
 import Data.Word (Word32)
+import Control.Monad.IO.Class (MonadIO)
 
 newtype Entity = Entity Word32
 
@@ -38,7 +39,7 @@ removeEntity :: Entities -> Entity -> IO ()
 removeEntity (Entities entities _) (Entity key) = S.remove entities key
 {-# INLINE removeEntity #-}
 
-forEntities :: Entities -> (Entity -> IO ()) -> IO ()
+forEntities :: MonadIO m => Entities -> (Entity -> m ()) -> m ()
 forEntities (Entities entities _) f = S.for entities (coerce f)
 {-# INLINE forEntities #-}
 

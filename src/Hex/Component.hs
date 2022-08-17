@@ -21,6 +21,7 @@ import Data.Word (Word32)
 import Hex.Entity (Entity, MaxEntities (MaxEntities))
 import Type.Reflection (SomeTypeRep, Typeable, someTypeRep)
 import Unsafe.Coerce (unsafeCoerce)
+import Control.Monad.IO.Class
 
 -- | ComponentId is unique to a component within the context of a World.
 newtype ComponentId = ComponentId {unwrapComponentId :: Int} deriving (Show)
@@ -50,7 +51,7 @@ class ComponentDelete component store where
   storeDelete :: store component -> Entity -> IO ()
 
 class ComponentGet component store => ComponentIterate component store where
-  storeFor :: store component -> (Entity -> component -> IO ()) -> IO ()
+  storeFor :: MonadIO m => store component -> (Entity -> component -> m ()) -> m ()
   storeMembers :: store component -> IO Int
 
 newtype WrappedStorage = WrappedStorage (forall component. Store' component)

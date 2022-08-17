@@ -12,6 +12,7 @@ import Control.Monad
     when,
     (<$!>),
   )
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import Data.Coerce (Coercible, coerce)
 import Data.Functor ((<$>), (<&>))
 import Data.IORef
@@ -44,7 +45,7 @@ import Prelude hiding (id, (.))
 
 -- | A system is a function which can operate on the components of a world.
 -- Keep in mind that system has Functor, Applicative, Category and Arrow instances, but no Monad instance.
-newtype System m i o = System (World -> m (i -> m o))
+newtype System m i o = System (World -> IO (i -> m o))
 
 instance Monad m => Category (System m) where
   id = System (\_ -> pure (pure . id))
@@ -79,15 +80,14 @@ instance Applicative m => Applicative (System m i) where
   {-# INLINE pure #-}
   {-# INLINE (<*>) #-}
 
-
 -- | Lifs a normal function into a System.
 liftSystem :: Applicative m => (a -> m b) -> System m a b
 liftSystem f = System $ \_ -> pure $ f
 {-# INLINE liftSystem #-}
 
--- | Compiles a system with the given World and returns a function which executes 
+-- | Compiles a system with the given World and returns a function which executes
 -- the operations within the System.
-compileSystem :: System IO i o -> World -> IO (i -> IO o)
+compileSystem :: System m i o -> World -> IO (i -> m o)
 compileSystem (System f) w = f w
 {-# INLINE compileSystem #-}
 
@@ -95,135 +95,139 @@ compileSystem (System f) w = f w
 -- given function
 cmap ::
   forall a b m.
-  (QCI a, QCP b) =>
+  (QCI a, QCP b, MonadIO m) =>
   (a -> b) ->
-  System IO () ()
+  System m () ()
 cmap f =
   System
     ( \w -> do
         for <- queryFor @(S a) @a w
         put <- queryPut @(S b) @b w
-        pure $ \_ -> for $ \e a -> put e $! (f a)
+        pure $ \_ -> for $ \e a -> liftIO $ put e $! (f a)
     )
-
 
 -- | Iterates over all entities with the requested components and sets the components calculated by the
 -- given monadic function
-cmapM :: forall a b m. (QCI a, QCP b) => (a -> IO b) -> System IO () ()
+cmapM :: forall a b m. (QCI a, QCP b, MonadIO m) => (a -> m b) -> System m () ()
 cmapM f =
   System
     ( \w -> do
         for <- queryFor @(S a) @a w
         put <- queryPut @(S b) @b w
-        pure $ \_ -> for $ \e a -> f a >>= put e
+        pure $ \_ -> for $ \e a -> f a >>= liftIO . put e
     )
 
 -- | Iterates over all entities with the requested components and folds the components.
-cfold :: forall a o m. (Monoid o, QCI a) => (a -> o) -> System IO () o
+cfold :: forall a o m. (Monoid o, QCI a, MonadIO m) => (a -> o) -> System m () o
 cfold f = System $ \w -> do
   for <- queryFor @(S a) @a w
   members <- queryMembers @(S a) @a w
   pure $! \i2 -> do
-    ref <- newIORef (mempty :: o)
+    ref <- liftIO $ newIORef (mempty :: o)
     for $! \e a -> do
       let o = f a
-      modifyIORef' ref (<> o)
-    readIORef ref
+      liftIO $ modifyIORef' ref (<> o)
+    liftIO $ readIORef ref
 
 -- | Iterates over all entities with the requested components and monadically folds the components.
-cfoldM :: forall a o m. (Monoid o, QCI a) => (a -> IO o) -> System IO () o
+cfoldM :: forall a o m. (Monoid o, QCI a, MonadIO m) => (a -> m o) -> System m () o
 cfoldM f = System $ \w -> do
   for <- queryFor @(S a) @a w
   pure $! \i2 -> do
-    ref <- newIORef (mempty :: o)
+    ref <- liftIO $ newIORef (mempty :: o)
     for $! \e a -> do
       o <- f a
-      modifyIORef ref (<> o)
-    readIORef ref
+      liftIO $ modifyIORef ref (<> o)
+    liftIO $ readIORef ref
 
 -- | Iterates over all entities with the requested components and folds the components.
 -- The order of getting the components, so there is no real difference between cfoldr and cfoldl.
-cfoldr :: (QCI a) => (a -> b -> b) -> b -> System IO () b
+cfoldr :: (QCI a, MonadIO m) => (a -> b -> b) -> b -> System m () b
 cfoldr f b = fmap (($! b) . appEndo) $! cfold $! Endo #. f
 {-# INLINE cfoldr #-}
 
 -- | Iterates over all entities with the requested components and folds the components.
 -- The order of getting the components, so there is no real difference between cfoldr and cfoldl.
-cfoldl :: (QCI a) => (b -> a -> b) -> b -> System IO () b
+cfoldl :: (QCI a, MonadIO m) => (b -> a -> b) -> b -> System m () b
 cfoldl f b = fmap (($! b) . appEndo . getDual) $! cfold $! Dual . Endo . flip f
 {-# INLINE cfoldl #-}
 
 -- | Creates a new entity with the given components
-newEntity :: forall a. (QCP a) => System IO a Entity
+newEntity :: forall a m. (QCP a, MonadIO m) => System m a Entity
 newEntity = System $ \w -> do
   put <- queryPut @(S a) @a w
   pure $! \c -> do
-    e <- worldNewEntity w
-    put e c
+    e <- liftIO $ worldNewEntity w
+    liftIO $ put e c
     pure e
 {-# INLINE newEntity #-}
 
 -- | A Query is a function which can operate on the components of a world. In contrast to
 -- System, a query contains operations which operate on a single entity. System contains operations
 -- which can operate on many entities.
-newtype Query m i o = Query (World -> IO (Entity -> i -> IO o))
+newtype Query m i o = Query (World -> IO (Entity -> i -> m o))
 
 -- | Execute a query on all matching entities
-runQuery :: forall i1 i2 o. (QCI i1, Monoid o) => Query IO (i1, i2) o -> System IO i2 o
+runQuery :: forall i1 i2 o m. (QCI i1, Monoid o, MonadIO m) => Query m (i1, i2) o -> System m i2 o
 runQuery (Query makeQ) = System $ \w -> do
   q <- makeQ w
   for <- queryFor @(S i1) @i1 w
   pure $ \i2 -> do
-    ref <- newIORef (mempty :: o)
+    ref <- liftIO $ newIORef (mempty :: o)
     for $! \e i1 -> do
       o <- q e (i1, i2)
-      modifyIORef' ref (<> o)
-    readIORef ref
+      liftIO $ modifyIORef' ref (<> o)
+    liftIO $ readIORef ref
 {-# INLINE runQuery #-}
 
 -- | Execute a query on all matching entities
-runQuery_ :: forall i o. (QCI i) => Query IO i o -> System IO () ()
+runQuery_ :: forall i o m. (QCI i, MonadIO m) => Query m i o -> System m () ()
 runQuery_ (Query makeQ) = System $ \w -> do
   q <- makeQ w
   for <- queryFor @(S i) @i w
   pure $ \_ -> for (fmap (fmap void) q)
 {-# INLINE runQuery_ #-}
 
--- | Execute a query on the given entity. If the entity does not have the 
+-- | Execute a query on the given entity. If the entity does not have the
 -- requested components, nothing is done.
-singleQuery_ :: forall i o. (QCG i) => Query IO i o -> World -> IO (Entity -> IO ())
+singleQuery_ :: forall i o m. (QCG i, MonadIO m) => Query m i o -> World -> IO (Entity -> m ())
 singleQuery_ (Query makeQ) w = do
   q <- makeQ w
   getValues <- queryGet @(S i) @i w
   contains <- queryContains @(S i) @i w
   pure $ \e -> do
-    whenIO (contains e) $ do
-      values <- getValues e
+    whenIO (liftIO $ contains e) $ do
+      values <- liftIO $ getValues e
       q e values
       pure ()
 {-# INLINE singleQuery_ #-}
 
--- | Execute a query on the given entity. If the entity does not have the 
+-- | Execute a query on the given entity. If the entity does not have the
 -- requested components, Nothing is returned.
-singleQuery :: forall i1 i2 o. (QCG i1) => Query IO (i1, i2) o -> World -> IO (Entity -> i2 -> IO (Maybe o))
+singleQuery ::
+  forall i1 i2 o m.
+  (QCG i1, MonadIO m) =>
+  Query m (i1, i2) o ->
+  World ->
+  IO (Entity -> i2 -> m (Maybe o))
 singleQuery (Query makeQ) w = do
   q <- makeQ w
   getValues <- queryGet @(S i1) @i1 w
   contains <- queryContains @(S i1) @i1 w
   pure $ \e i2 -> do
-    c <- (contains e)
+    c <- (liftIO $ contains e)
     if c
       then do
-        values <- getValues e
+        values <- liftIO $ getValues e
         Just <$> q e (values, i2)
       else pure Nothing
 {-# INLINE singleQuery #-}
 
 -- Lifts a normal function into a Query
-liftQuery :: (a -> IO b) -> Query IO a b
+liftQuery :: Applicative m => (a -> m b) -> Query m a b
 liftQuery f = Query $ \_ -> pure $ \_ a -> f a
 
-instance Applicative m => Category (Query m) where
+instance Monad m => Category (Query m) where
   id = Query $ \_ -> pure $ \_ i -> pure i
   (Query makeS1) . (Query makeS2) = Query $ \w -> do
     s1 <- makeS1 w
@@ -232,7 +236,7 @@ instance Applicative m => Category (Query m) where
   {-# INLINE id #-}
   {-# INLINE (.) #-}
 
-instance Applicative m => Arrow (Query m) where
+instance Monad m => Arrow (Query m) where
   arr f = Query $ \_ -> pure $ \_ -> pure . f
   (Query makeS1) *** (Query makeS2) = Query $ \w -> do
     s1 <- makeS1 w
@@ -242,17 +246,17 @@ instance Applicative m => Arrow (Query m) where
   {-# INLINE (***) #-}
 
 -- Set a component of the matching entity
-qput :: forall i m. QCP i => Query IO i ()
+qput :: forall i m. (QCP i, MonadIO m) => Query m i ()
 qput = Query $ \w -> do
   put <- queryPut @(S i) @i w
-  pure put
+  pure (fmap liftIO . put)
 {-# INLINE qput #-}
 
 -- Delete the component of the matching entity
-qdelete :: forall i m. QCD i => Query IO i ()
+qdelete :: forall i m. (QCD i, MonadIO m) => Query m i ()
 qdelete = Query $ \w -> do
   delete <- queryDelete @(S i) @i w
-  pure $! \e _ -> delete e
+  pure $! \e _ -> liftIO $ delete e
 {-# INLINE qdelete #-}
 
 type family S a where
@@ -273,7 +277,7 @@ class QueryDelete (f :: Bool) components where
   queryDelete :: World -> IO (Entity -> IO ())
 
 class QueryGet f components => QueryIterate (f :: Bool) components where
-  queryFor :: World -> IO ((Entity -> components -> IO ()) -> IO ())
+  queryFor :: MonadIO m => World -> IO ((Entity -> components -> m ()) -> m ())
   queryMembers :: World -> IO (IO Int)
 
 -- | Machinery for getting components
@@ -375,18 +379,18 @@ instance (QCI a, QCI b) => QueryIterate False (a, b) where
     getA <- queryGet @(S a) @a w
     getB <- queryGet @(S b) @b w
     pure $! \f -> do
-      amountA <- membersA
-      amountB <- membersB
+      amountA <- liftIO $ membersA
+      amountB <- liftIO $ membersB
       if amountA > amountB
         then
           forB $! \e bs -> do
-            whenIO (containsA e) $! do
-              as <- getA e
+            whenIO (liftIO $ containsA e) $! do
+              as <- liftIO $ getA e
               f e (as, bs)
         else
           forA $! \e as -> do
-            whenIO (containsA e) $! do
-              bs <- getB e
+            whenIO (liftIO $ containsA e) $! do
+              bs <- liftIO $ getB e
               f e (as, bs)
   queryMembers w = do
     membersA <- queryMembers @(S a) @a w
@@ -440,45 +444,45 @@ instance (QCI a, QCI b, QCI c) => QueryIterate False (a, b, c) where
     getB <- queryGet @(S b) @b w
     getC <- queryGet @(S c) @c w
     pure $! \f -> do
-      amountA <- membersA
-      amountB <- membersB
-      amountC <- membersC
+      amountA <- liftIO $ membersA
+      amountB <- liftIO $ membersB
+      amountC <- liftIO $ membersC
       if amountA > amountB
         then
           if amountB > amountC
             then
               forC $! \e cs -> do
-                whenIO (containsA e)
-                  $! whenIO (containsB e)
+                whenIO (liftIO $ containsA e)
+                  $! whenIO (liftIO $ containsB e)
                   $! do
-                    as <- getA e
-                    bs <- getB e
+                    as <- liftIO $ getA e
+                    bs <- liftIO $ getB e
                     f e (as, bs, cs)
             else
               forB $! \e bs -> do
-                whenIO (containsA e)
-                  $! whenIO (containsC e)
+                whenIO (liftIO $ containsA e)
+                  $! whenIO (liftIO $ containsC e)
                   $! do
-                    as <- getA e
-                    cs <- getC e
+                    as <- liftIO $ getA e
+                    cs <- liftIO $ getC e
                     f e (as, bs, cs)
         else
           if amountA > amountC
             then
               forC $! \e cs -> do
-                whenIO (containsA e)
-                  $! whenIO (containsB e)
+                whenIO (liftIO $ containsA e)
+                  $! whenIO (liftIO $ containsB e)
                   $! do
-                    as <- getA e
-                    bs <- getB e
+                    as <- liftIO $ getA e
+                    bs <- liftIO $ getB e
                     f e (as, bs, cs)
             else
               forA $! \e as -> do
-                whenIO (containsB e)
-                  $! whenIO (containsC e)
+                whenIO (liftIO $ containsB e)
+                  $! whenIO (liftIO $ containsC e)
                   $! do
-                    cs <- getC e
-                    bs <- getB e
+                    cs <- liftIO $ getC e
+                    bs <- liftIO $ getB e
                     f e (as, bs, cs)
   queryMembers w = do
     membersA <- queryMembers @(S a) @a w
@@ -489,7 +493,7 @@ instance (QCI a, QCI b, QCI c) => QueryIterate False (a, b, c) where
   {-# INLINE queryFor #-}
   {-# INLINE queryMembers #-}
 
-whenIO :: IO Bool -> IO () -> IO ()
+whenIO :: Monad m => m Bool -> m () -> m ()
 whenIO action f = do
   b <- action
   when b f
