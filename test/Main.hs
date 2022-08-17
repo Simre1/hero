@@ -9,15 +9,15 @@ import Data.Functor ((<&>))
 import qualified Data.SparseSet.Storable as S
 import Data.Traversable (for)
 import Foreign.Storable.Generic (GStorable)
-import Hex.Internal.System
-import Hex.Internal.World
+import Hex.System
+import Hex.World
 import Test.Tasty
 import Test.Tasty.HUnit (testCase, (@?))
 import Data.Monoid
 import GHC.Generics
 import Control.Arrow
-import Hex.Internal.Component
-import Hex.Internal.Component.SparseSet
+import Hex.Component
+import Hex.Component.SparseSet
 
 data Position = Position {-# UNPACK #-} !Int deriving (Generic)
 

@@ -2,7 +2,7 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Hex.Internal.System where
+module Hex.System where
 
 import Control.Arrow (Arrow (arr, (***)))
 import Control.Category (Category (..))
@@ -26,7 +26,7 @@ import Data.Monoid
     Monoid (mempty),
     (<>),
   )
-import Hex.Internal.Component
+import Hex.Component
   ( Component,
     ComponentStore
       ( storeContains,
@@ -37,8 +37,8 @@ import Hex.Internal.Component
         storePut
       ),
   )
-import Hex.Internal.Entity (Entity, entityAmount, forEntities)
-import Hex.Internal.World
+import Hex.Entity (Entity, entityAmount, forEntities)
+import Hex.World
   ( World (worldEntities),
     worldComponent,
     worldNewEntity,

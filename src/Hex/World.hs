@@ -1,9 +1,9 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 
-module Hex.Internal.World where
+module Hex.World where
 
 import Data.Word (Word32)
-import Hex.Internal.Component
+import Hex.Component
   ( Component,
     ComponentId,
     Store',
@@ -12,7 +12,7 @@ import Hex.Internal.Component
     getStore,
     newStores,
   )
-import Hex.Internal.Entity
+import Hex.Entity
   ( Entities,
     Entity,
     MaxEntities (..),

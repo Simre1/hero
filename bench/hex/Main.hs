@@ -8,11 +8,11 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Foreign.Storable.Generic (GStorable)
 import GHC.Generics (Generic)
-import Hex.Internal.Component
-import Hex.Internal.Entity (Entity (..), MaxEntities (MaxEntities))
-import Hex.Internal.System
-import Hex.Internal.Component.SparseSet
-import Hex.Internal.World
+import Hex.Component
+import Hex.Entity (Entity (..), MaxEntities (MaxEntities))
+import Hex.System
+import Hex.Component.SparseSet
+import Hex.World
 import Test.Tasty.Bench
 import Control.Arrow
 import qualified Data.SparseSet.Storable as SV

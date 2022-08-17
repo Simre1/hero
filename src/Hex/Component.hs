@@ -2,7 +2,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Hex.Internal.Component where
+module Hex.Component where
 
 import Data.IORef
   ( IORef,
@@ -16,7 +16,7 @@ import Data.Map qualified as M
 import Data.Proxy (Proxy (Proxy))
 import Data.Vector.Mutable qualified as V
 import Data.Vector.Storable (Storable)
-import Hex.Internal.Entity (Entity, MaxEntities)
+import Hex.Entity (Entity, MaxEntities)
 import Type.Reflection (SomeTypeRep, Typeable, someTypeRep)
 import Unsafe.Coerce (unsafeCoerce)
 

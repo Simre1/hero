@@ -1,4 +1,4 @@
-module Hex.Internal.Entity where
+module Hex.Entity where
 
 import Data.Coerce (coerce)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)

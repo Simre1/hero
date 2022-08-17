@@ -1,12 +1,12 @@
-module Hex.Internal.Component.SparseSet where
+module Hex.Component.SparseSet where
 
 import Data.Coerce ( coerce )
 import Data.SparseSet.Storable qualified as SV
 import Data.SparseSet.Unboxed qualified as SU
 import Data.Vector.Storable (Storable)
 import Data.Vector.Unboxed (Unbox)
-import Hex.Internal.Component ( ComponentStore(..) )
-import Hex.Internal.Entity
+import Hex.Component ( ComponentStore(..) )
+import Hex.Entity
     ( MaxEntities(MaxEntities), Entity(Entity) )
 
 newtype SparseSetUnboxedStore a = SparseSetUnboxedStore (SU.SparseSetUnboxed a)

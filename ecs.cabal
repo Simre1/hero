@@ -22,7 +22,7 @@ maintainer:         simre4775@gmail.com
 extra-source-files: CHANGELOG.md
 
 library
-    build-depends:    base >4.13.0.0, vector > 0.12, transformers, unliftio, containers, template-haskell, ghc-prim, deepseq
+    build-depends:    base >4.13.0.0, vector > 0.12, transformers, containers
     hs-source-dirs:   src
     exposed-modules:
         Data.SparseSet.Unboxed,
@@ -30,13 +30,11 @@ library
         Data.SparseSet.NoComponent,
         Data.SparseSet.Prim,
 
-        Hex.Internal.World,
-        Hex.Internal.Component,
-        Hex.Internal.Component.ComponentId,
-        Hex.Internal.Component.Data
-        Hex.Internal.Entity,
-        Hex.Internal.System,
-        Hex.Internal.Component.SparseSet
+        Hex.World,
+        Hex.Component,
+        Hex.Entity,
+        Hex.System,
+        Hex.Component.SparseSet
 
     default-language: GHC2021
     default-extensions:
