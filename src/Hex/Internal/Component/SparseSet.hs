@@ -1,15 +1,13 @@
 module Hex.Internal.Component.SparseSet where
 
-import Control.Monad.IO.Class
-import Data.Coerce
-import Data.Kind
+import Data.Coerce ( coerce )
+import Data.SparseSet.Storable qualified as SV
 import Data.SparseSet.Unboxed qualified as SU
-import Data.Vector.Unboxed (Unbox)
-import Hex.Internal.Component
-import Hex.Internal.Entity
 import Data.Vector.Storable (Storable)
-import qualified Data.SparseSet.Storable as SV
-
+import Data.Vector.Unboxed (Unbox)
+import Hex.Internal.Component ( ComponentStore(..) )
+import Hex.Internal.Entity
+    ( MaxEntities(MaxEntities), Entity(Entity) )
 
 newtype SparseSetUnboxedStore a = SparseSetUnboxedStore (SU.SparseSetUnboxed a)
 
@@ -26,9 +24,7 @@ instance Unbox a => ComponentStore a SparseSetUnboxedStore where
   {-# INLINE storePut #-}
   {-# INLINE storeDelete #-}
   {-# INLINE storeFor #-}
-  {-# INLINE storeMembers #-}        
-
-
+  {-# INLINE storeMembers #-}
 
 newtype SparseSetStorableStore a = SparseSetStorableStore (SV.SparseSetStorable a)
 
@@ -45,4 +41,4 @@ instance Storable a => ComponentStore a SparseSetStorableStore where
   {-# INLINE storePut #-}
   {-# INLINE storeDelete #-}
   {-# INLINE storeFor #-}
-  {-# INLINE storeMembers #-}      
+  {-# INLINE storeMembers #-}

@@ -1,9 +1,24 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+
 module Hex.Internal.World where
 
 import Data.Word (Word32)
 import Hex.Internal.Component
+  ( Component,
+    ComponentId,
+    Store',
+    Stores,
+    getComponentId,
+    getStore,
+    newStores,
+  )
 import Hex.Internal.Entity
+  ( Entities,
+    Entity,
+    MaxEntities (..),
+    newEntities,
+    newEntity,
+  )
 
 data World = World
   { worldStores :: {-# UNPACK #-} !Stores,

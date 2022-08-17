@@ -1,10 +1,10 @@
 module Hex.Internal.Entity where
-import Data.Word
 
-import qualified Data.Vector.Unboxed.Mutable as VU
-import qualified Data.SparseSet.NoComponent as S
-import Data.IORef ( newIORef, readIORef, writeIORef, IORef )
-import Data.Coerce ( coerce )
+import Data.Coerce (coerce)
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import Data.SparseSet.NoComponent qualified as S
+import Data.Vector.Unboxed.Mutable qualified as VU
+import Data.Word (Word32)
 
 newtype Entity = Entity Word32
 
@@ -27,18 +27,16 @@ newEntity (MaxEntities max) (Entities entities lastIdRef) = do
   pure $ Entity nextId
   where
     findNext last distance = do
-      let next = last + distance `mod` max 
-      contained <- S.contains entities next 
+      let next = last + distance `mod` max
+      contained <- S.contains entities next
       if contained
-        then findNext last ((distance + 1)^2)
+        then findNext last ((distance + 1) ^ 2)
         else pure next
 {-# INLINE newEntity #-}
 
-
 removeEntity :: Entities -> Entity -> IO ()
-removeEntity (Entities entities _) (Entity key) = S.remove entities key 
+removeEntity (Entities entities _) (Entity key) = S.remove entities key
 {-# INLINE removeEntity #-}
-
 
 forEntities :: Entities -> (Entity -> IO ()) -> IO ()
 forEntities (Entities entities _) f = S.for entities (coerce f)
@@ -47,4 +45,3 @@ forEntities (Entities entities _) f = S.for entities (coerce f)
 entityAmount :: Entities -> IO Int
 entityAmount (Entities entities _) = S.size entities
 {-# INLINE entityAmount #-}
-

@@ -4,24 +4,21 @@
 
 module Hex.Internal.Component where
 
--- import Data.HashTable.IO as H
-
-import Control.Monad.IO.Class
--- import Data.Map.Strict qualified as M
-
-import Data.Coerce
 import Data.IORef
-import Data.Kind
+  ( IORef,
+    modifyIORef,
+    newIORef,
+    readIORef,
+    writeIORef,
+  )
+import Data.Kind (Type)
 import Data.Map qualified as M
-import Data.Proxy
-import Data.SparseSet.Storable
-import Data.SparseSet.Storable qualified as SV
+import Data.Proxy (Proxy (Proxy))
 import Data.Vector.Mutable qualified as V
 import Data.Vector.Storable (Storable)
-import Hex.Internal.Component.ComponentId
-import Hex.Internal.Entity
-import Type.Reflection
-import Unsafe.Coerce
+import Hex.Internal.Entity (Entity, MaxEntities)
+import Type.Reflection (SomeTypeRep, Typeable, someTypeRep)
+import Unsafe.Coerce (unsafeCoerce)
 
 newtype ComponentId = ComponentId {unwrapComponentId :: Int} deriving (Show)
 
