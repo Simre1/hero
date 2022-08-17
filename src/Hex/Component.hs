@@ -22,8 +22,11 @@ import Hex.Entity (Entity, MaxEntities (MaxEntities))
 import Type.Reflection (SomeTypeRep, Typeable, someTypeRep)
 import Unsafe.Coerce (unsafeCoerce)
 
+-- | ComponentId is unique to a component within the context of a World.
 newtype ComponentId = ComponentId {unwrapComponentId :: Int} deriving (Show)
 
+-- | A component is a Haskell datatype usually containing raw data.
+-- For example `data Position = Position Float Float`
 class (ComponentMakeStore component (Store component), Typeable component) => Component component where
   type Store component :: Type -> Type
   liveEntities :: Maybe Word32

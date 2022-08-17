@@ -1,16 +1,24 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances, MagicHash, UnboxedTuples #-}
-{-# OPTIONS_GHC -fplugin=Foreign.Storable.Generic.Plugin #-}
+{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE UnliftedNewtypes #-}
+{-# OPTIONS_GHC -fplugin=Foreign.Storable.Generic.Plugin #-}
 
-import Control.Monad
-import Control.Monad.IO.Class
+import Control.Monad ( forM_ )
+import qualified Data.SparseSet.Storable as SV
 import Foreign.Storable.Generic (GStorable)
 import GHC.Generics (Generic)
-import Test.Tasty.Bench
-import qualified Data.SparseSet.Storable as SV
 import Hex
+    ( Component(Store),
+      SparseSetStorableStore,
+      World,
+      newWorld,
+      System,
+      compileSystem,
+      cmap,
+      newEntity )
+import Test.Tasty.Bench ( bench, defaultMain, whnfIO )
 
 data Position = Position {-# UNPACK #-} !Int {-# UNPACK #-} !Int deriving (Generic)
 
@@ -51,13 +59,8 @@ physicsWorld = do
   pure world
 
 physics :: System IO () ()
-physics = foldl (*>) sys $ const sys <$> [1..20]
-  where sys = 
-          cmap (\(Velocity vx vy, Acceleration ax ay) -> Velocity (vx + ax) (vy + ay)) *>
-          cmap (\(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy))
-
-
-
-        -- *> cmap (\(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy))
-        -- *> cfoldl (\s (Position x y) -> s + x + y) (0 :: Int)
-        -- *> pure ()
+physics = foldl (*>) sys $ const sys <$> [1 .. 20]
+  where
+    sys =
+      cmap (\(Velocity vx vy, Acceleration ax ay) -> Velocity (vx + ax) (vy + ay))
+        *> cmap (\(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy))

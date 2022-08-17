@@ -26,6 +26,8 @@ data World = World
     worldMaxEntities :: {-# UNPACK #-} !MaxEntities
   }
 
+-- | Create a new world which can hold as many entities as were specified in the input parameter.
+--   Keep in mind that a greater maximum results in greater memory usage.
 newWorld :: Word32 -> IO World
 newWorld !max = do
   let maxEnts = MaxEntities max

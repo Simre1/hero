@@ -19,6 +19,7 @@ import Hex.Entity
     MaxEntities (MaxEntities),
   )
 
+-- | Component store backed by an unboxed sparse set
 newtype SparseSetUnboxedStore a = SparseSetUnboxedStore (SU.SparseSetUnboxed a)
 
 instance (Unbox a) => ComponentGet a SparseSetUnboxedStore where
@@ -44,6 +45,7 @@ instance (Unbox a) => ComponentIterate a SparseSetUnboxedStore where
 instance (Unbox a) => ComponentMakeStore a SparseSetUnboxedStore where
   makeStore (MakeStore global component) = SparseSetUnboxedStore <$> SU.create global component
 
+-- | Component store backed by a storable sparse set
 newtype SparseSetStorableStore a = SparseSetStorableStore (SV.SparseSetStorable a)
 
 instance (Storable a) => ComponentGet a SparseSetStorableStore where

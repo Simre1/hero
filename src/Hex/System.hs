@@ -42,6 +42,8 @@ import Hex.World
   )
 import Prelude hiding (id, (.))
 
+-- | A system is a function which can operate on the components of a world.
+-- Keep in mind that system has Functor, Applicative, Category and Arrow instances, but no Monad instance.
 newtype System m i o = System (World -> m (i -> m o))
 
 instance Monad m => Category (System m) where
@@ -77,14 +79,20 @@ instance Applicative m => Applicative (System m i) where
   {-# INLINE pure #-}
   {-# INLINE (<*>) #-}
 
+
+-- | Lifs a normal function into a System.
 liftSystem :: Applicative m => (a -> m b) -> System m a b
 liftSystem f = System $ \_ -> pure $ f
 {-# INLINE liftSystem #-}
 
+-- | Compiles a system with the given World and returns a function which executes 
+-- the operations within the System.
 compileSystem :: System IO i o -> World -> IO (i -> IO o)
 compileSystem (System f) w = f w
 {-# INLINE compileSystem #-}
 
+-- | Iterates over all entities with the requested components and sets the components calculated by the
+-- given function
 cmap ::
   forall a b m.
   (QCI a, QCP b) =>
@@ -98,6 +106,9 @@ cmap f =
         pure $ \_ -> for $ \e a -> put e $! (f a)
     )
 
+
+-- | Iterates over all entities with the requested components and sets the components calculated by the
+-- given monadic function
 cmapM :: forall a b m. (QCI a, QCP b) => (a -> IO b) -> System IO () ()
 cmapM f =
   System
@@ -107,6 +118,7 @@ cmapM f =
         pure $ \_ -> for $ \e a -> f a >>= put e
     )
 
+-- | Iterates over all entities with the requested components and folds the components.
 cfold :: forall a o m. (Monoid o, QCI a) => (a -> o) -> System IO () o
 cfold f = System $ \w -> do
   for <- queryFor @(S a) @a w
@@ -118,6 +130,7 @@ cfold f = System $ \w -> do
       modifyIORef' ref (<> o)
     readIORef ref
 
+-- | Iterates over all entities with the requested components and monadically folds the components.
 cfoldM :: forall a o m. (Monoid o, QCI a) => (a -> IO o) -> System IO () o
 cfoldM f = System $ \w -> do
   for <- queryFor @(S a) @a w
@@ -128,14 +141,19 @@ cfoldM f = System $ \w -> do
       modifyIORef ref (<> o)
     readIORef ref
 
+-- | Iterates over all entities with the requested components and folds the components.
+-- The order of getting the components, so there is no real difference between cfoldr and cfoldl.
 cfoldr :: (QCI a) => (a -> b -> b) -> b -> System IO () b
 cfoldr f b = fmap (($! b) . appEndo) $! cfold $! Endo #. f
 {-# INLINE cfoldr #-}
 
+-- | Iterates over all entities with the requested components and folds the components.
+-- The order of getting the components, so there is no real difference between cfoldr and cfoldl.
 cfoldl :: (QCI a) => (b -> a -> b) -> b -> System IO () b
 cfoldl f b = fmap (($! b) . appEndo . getDual) $! cfold $! Dual . Endo . flip f
 {-# INLINE cfoldl #-}
 
+-- | Creates a new entity with the given components
 newEntity :: forall a. (QCP a) => System IO a Entity
 newEntity = System $ \w -> do
   put <- queryPut @(S a) @a w
@@ -145,6 +163,12 @@ newEntity = System $ \w -> do
     pure e
 {-# INLINE newEntity #-}
 
+-- | A Query is a function which can operate on the components of a world. In contrast to
+-- System, a query contains operations which operate on a single entity. System contains operations
+-- which can operate on many entities.
+newtype Query m i o = Query (World -> IO (Entity -> i -> IO o))
+
+-- | Execute a query on all matching entities
 runQuery :: forall i1 i2 o. (QCI i1, Monoid o) => Query IO (i1, i2) o -> System IO i2 o
 runQuery (Query makeQ) = System $ \w -> do
   q <- makeQ w
@@ -157,6 +181,7 @@ runQuery (Query makeQ) = System $ \w -> do
     readIORef ref
 {-# INLINE runQuery #-}
 
+-- | Execute a query on all matching entities
 runQuery_ :: forall i o. (QCI i) => Query IO i o -> System IO () ()
 runQuery_ (Query makeQ) = System $ \w -> do
   q <- makeQ w
@@ -164,6 +189,8 @@ runQuery_ (Query makeQ) = System $ \w -> do
   pure $ \_ -> for (fmap (fmap void) q)
 {-# INLINE runQuery_ #-}
 
+-- | Execute a query on the given entity. If the entity does not have the 
+-- requested components, nothing is done.
 singleQuery_ :: forall i o. (QCG i) => Query IO i o -> World -> IO (Entity -> IO ())
 singleQuery_ (Query makeQ) w = do
   q <- makeQ w
@@ -176,6 +203,8 @@ singleQuery_ (Query makeQ) w = do
       pure ()
 {-# INLINE singleQuery_ #-}
 
+-- | Execute a query on the given entity. If the entity does not have the 
+-- requested components, Nothing is returned.
 singleQuery :: forall i1 i2 o. (QCG i1) => Query IO (i1, i2) o -> World -> IO (Entity -> i2 -> IO (Maybe o))
 singleQuery (Query makeQ) w = do
   q <- makeQ w
@@ -190,8 +219,7 @@ singleQuery (Query makeQ) w = do
       else pure Nothing
 {-# INLINE singleQuery #-}
 
-newtype Query m i o = Query (World -> IO (Entity -> i -> IO o))
-
+-- Lifts a normal function into a Query
 liftQuery :: (a -> IO b) -> Query IO a b
 liftQuery f = Query $ \_ -> pure $ \_ a -> f a
 
@@ -213,12 +241,14 @@ instance Applicative m => Arrow (Query m) where
   {-# INLINE arr #-}
   {-# INLINE (***) #-}
 
+-- Set a component of the matching entity
 qput :: forall i m. QCP i => Query IO i ()
 qput = Query $ \w -> do
   put <- queryPut @(S i) @i w
   pure put
 {-# INLINE qput #-}
 
+-- Delete the component of the matching entity
 qdelete :: forall i m. QCD i => Query IO i ()
 qdelete = Query $ \w -> do
   delete <- queryDelete @(S i) @i w
@@ -246,12 +276,16 @@ class QueryGet f components => QueryIterate (f :: Bool) components where
   queryFor :: World -> IO ((Entity -> components -> IO ()) -> IO ())
   queryMembers :: World -> IO (IO Int)
 
+-- | Machinery for getting components
 type QCG (a :: *) = QueryGet (S a) a
 
+-- | Machinery for putting components
 type QCP (a :: *) = QueryPut (S a) a
 
+-- | Machinery for deleting components
 type QCD (a :: *) = QueryDelete (S a) a
 
+-- | Machinery for iterating over components
 type QCI (a :: *) = QueryIterate (S a) a
 
 instance QueryGet False () where
