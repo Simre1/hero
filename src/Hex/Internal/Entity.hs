@@ -6,7 +6,7 @@ import qualified Data.SparseSet.NoComponent as S
 import Data.IORef
 import Data.Coerce
 
-newtype Entity = Entity Word32 deriving Show
+newtype Entity = Entity Word32
 
 newtype MaxEntities = MaxEntities Word32
 

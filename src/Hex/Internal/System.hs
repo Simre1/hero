@@ -1,5 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ApplicativeDo #-}
+
 
 module Hex.Internal.System where
 
@@ -18,9 +20,9 @@ import Hex.Internal.World
 import Language.Haskell.TH
 import Prelude hiding (id, (.))
 
-newtype System m i o = System (World -> IO (i -> IO o))
+newtype System m i o = System (World -> m (i -> m o))
 
-instance Applicative m => Category (System m) where
+instance Monad m => Category (System m) where
   id = System (\_ -> pure (pure . id))
   (System f1) . (System f2) = System $ \w -> do
     f1' <- f1 w
@@ -29,7 +31,7 @@ instance Applicative m => Category (System m) where
   {-# INLINE id #-}
   {-# INLINE (.) #-}
 
-instance Applicative m => Arrow (System m) where
+instance Monad m => Arrow (System m) where
   arr f = System (\_ -> pure (pure . f))
   (System f1) *** (System f2) = System $ \w -> do
     f1' <- f1 w
@@ -40,8 +42,8 @@ instance Applicative m => Arrow (System m) where
 
 instance Applicative m => Functor (System m i) where
   fmap f (System makeS) = System $ \w -> do
-    q <- makeS w
-    pure $ \i -> fmap f (q i)
+    s <- makeS w
+    pure $ \i -> fmap f (s i)
   {-# INLINE fmap #-}
 
 instance Applicative m => Applicative (System m i) where
@@ -53,17 +55,26 @@ instance Applicative m => Applicative (System m i) where
   {-# INLINE pure #-}
   {-# INLINE (<*>) #-}
 
+arrM :: Applicative m => (a -> m b) -> System m a b
+arrM f = System $ \_ -> pure $ f
+{-# INLINE arrM #-}
+
+
 compileSystem :: System IO i o -> World -> IO (i -> IO o)
 compileSystem (System f) w = f w
 {-# INLINE compileSystem #-}
 
-cmap :: forall a b m. (QC a, QC b) => (a -> b) -> System IO () ()
+cmap ::
+  forall a b m.
+  (QC a, QC b) =>
+  (a -> b) ->
+  System IO () ()
 cmap f =
   System
     ( \w -> do
         for <- queryFor @(S a) @a w
         put <- queryPut @(S b) @b w
-        pure $ \_ -> for $ \e a -> put e (f a)
+        pure $ \_ -> for $ \e a -> put e $! (f a)
     )
 
 cmapM :: forall a b m. (QC a, QC b) => (a -> IO b) -> System IO () ()
@@ -82,7 +93,7 @@ cfold f = System $ \w -> do
     ref <- newIORef (mempty :: o)
     for $! \e a -> do
       let o = f a
-      modifyIORef ref (<> o)
+      modifyIORef' ref (<> o)
     readIORef ref
 
 cfoldM :: forall a o m. (Monoid o, QC a) => (a -> IO o) -> System IO () o
@@ -110,14 +121,13 @@ newEntity = System $ \w -> do
     e <- worldNewEntity w
     put e c
     pure e
-
+{-# INLINE newEntity #-}
 
 -- queryExec :: (QC i, QC o) => Query IO i o -> System IO () ()
 -- queryExec (Query makeQ) = System $ \w -> do
 --   q <- makeQ w
 --   for <- queryFor @(S i) @i w
---   pure $ \_ -> for 
-
+--   pure $ \_ -> for
 
 newtype Query m i o = Query (World -> IO (Entity -> i -> IO o))
 
@@ -129,7 +139,6 @@ instance Applicative m => Category (Query m) where
     pure $ \e i -> s2 e i >>= s1 e
   {-# INLINE id #-}
   {-# INLINE (.) #-}
-
 
 instance Applicative m => Arrow (Query m) where
   arr f = Query $ \_ -> pure $ \_ -> pure . f
@@ -144,7 +153,6 @@ qput :: forall i m. QC i => Query IO i ()
 qput = Query $ \w -> do
   put <- queryPut @(S i) @i w
   pure put
-
 {-# INLINE qput #-}
 
 qdelete :: forall i m. QC i => Query IO i ()
@@ -153,10 +161,9 @@ qdelete = Query $ \w -> do
   pure $! \e _ -> delete e
 {-# INLINE qdelete #-}
 
-
-
 type family S a where
   S () = False
+  S Entity = False
   S (a, b) = False
   S (a, b, c) = False
   S _ = True
@@ -189,10 +196,10 @@ instance QueryComponent False () where
   {-# INLINE queryMembers #-}
 
 instance Component a => QueryComponent True a where
-  queryContains w = worldComponent @a w <&> \s e -> storeContains s e
-  queryGet w = worldComponent @a w <&> \s e -> storeGet s e
-  queryPut w = worldComponent w <&> \s e c -> storePut s e c
-  queryDelete w = worldComponent @a w <&> \s e -> storeDelete s e
+  queryContains w = worldComponent @a w <&> \s !e -> storeContains s e
+  queryGet w = worldComponent @a w <&> \s !e -> storeGet s e
+  queryPut w = worldComponent w <&> \s !e c -> storePut s e c
+  queryDelete w = worldComponent @a w <&> \s !e -> storeDelete s e
   queryFor w = worldComponent @a w <&> \s f -> storeFor s f
   queryMembers w = worldComponent @a w <&> storeMembers
   {-# INLINE queryContains #-}
@@ -338,6 +345,7 @@ whenIO :: IO Bool -> IO () -> IO ()
 whenIO action f = do
   b <- action
   when b f
+{-# INLINE whenIO #-}
 
 (#.) :: Coercible b c => (b -> c) -> (a -> b) -> (a -> c)
 (#.) _f = coerce

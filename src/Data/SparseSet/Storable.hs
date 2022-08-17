@@ -22,81 +22,79 @@ import Data.Vector.Storable.Mutable qualified as VM
 import Data.Word
 import Prelude hiding (lookup)
 
+-- newtype SparseSetStorable a = SparseSetStorable (IORef (SparseSetStorable' a))
+
 data SparseSetStorable a = SparseSetStorable
   { sparseSetSparse :: {-# UNPACK #-} !(VPM.IOVector Word32),
-    sparseSetEntities :: {-# UNPACK #-} !(IORef (VPM.IOVector Word32)),
-    sparseSetDense :: {-# UNPACK #-} !(IORef (VM.IOVector a)),
+    sparseSetEntities :: {-# UNPACK #-} !(VPM.IOVector Word32),
+    sparseSetDense :: {-# UNPACK #-} !(VM.IOVector a),
     sparseSetSize :: {-# UNPACK #-} !(IORef Int)
   }
 
 create :: VM.Storable a => Word32 -> Word32 -> IO (SparseSetStorable a)
 create sparseSize denseSize = do
   !sparse <- VPM.replicate (fromIntegral sparseSize) maxBound
-  !dense <- VM.new (fromIntegral denseSize) >>= newIORef
-  !entities <- VPM.new (fromIntegral denseSize) >>= newIORef
-  !size <- newIORef 0
-  pure $ SparseSetStorable sparse entities dense size
+  !dense <- VM.new (fromIntegral denseSize)
+  !entities <- VPM.new (fromIntegral denseSize)
+  let !size = 0
+  SparseSetStorable sparse entities dense <$> newIORef size
 {-# INLINE create #-}
 
+
 insert :: (VM.Storable a) => SparseSetStorable a -> Word32 -> a -> IO ()
-insert set@(SparseSetStorable sparse entitiesRef denseRef sizeRef) i a = do
-  
+insert (SparseSetStorable sparse entities dense sizeRef) i a = do
   index <- VPM.unsafeRead sparse (fromIntegral i)
-  dense <- readIORef denseRef
   if index /= maxBound
     then VM.unsafeWrite dense (fromIntegral index) a
     else do
-      nextIndex <- atomicModifyIORef' sizeRef (\i -> (succ i, i))
+      nextIndex <- atomicModifyIORef' sizeRef (\size -> (succ size, size))
       let denseSize = VM.length dense
-      (dense, entities) <-
-        if (nextIndex >= denseSize)
-          then do
-            dense <- readIORef denseRef
-            newDense <- VM.unsafeGrow dense (denseSize `quot` 2)
-            writeIORef denseRef newDense
-            entities <- readIORef entitiesRef
-            newEntities <- VPM.unsafeGrow entities (denseSize `quot` 2)
-            writeIORef entitiesRef newEntities
-            pure (newDense, newEntities)
-          else (,) <$> readIORef denseRef <*> readIORef entitiesRef
+
+      -- if (nextIndex >= denseSize)
+      --   then do
+      --     newDense <- VM.unsafeGrow dense (denseSize `quot` 2)
+      --     newEntities <- VPM.unsafeGrow entities (denseSize `quot` 2)
+      --     VM.unsafeWrite newDense nextIndex a
+      --     VPM.unsafeWrite newEntities nextIndex i
+      --     VPM.unsafeWrite sparse (fromIntegral i) (fromIntegral nextIndex)
+      --     writeSet set $ SparseSetStorable' sparse newEntities newDense (size + 1)
+      --   else do
       VM.unsafeWrite dense nextIndex a
       VPM.unsafeWrite entities nextIndex i
       VPM.unsafeWrite sparse (fromIntegral i) (fromIntegral nextIndex)
 {-# INLINE insert #-}
 
 contains :: VM.Storable a => SparseSetStorable a -> Word32 -> IO Bool
-contains (SparseSetStorable sparse entities dense _) i = do
+contains (SparseSetStorable sparse _ _ _) i = do
   v <- VPM.unsafeRead sparse (fromIntegral i)
   pure $ v /= (maxBound :: Word32)
 {-# INLINE contains #-}
 
 size :: SparseSetStorable a -> IO Int
-size (SparseSetStorable _ entities _ sizeRef) = readIORef sizeRef
+size (SparseSetStorable _ _ _ sizeRef) = readIORef sizeRef
 {-# INLINE size #-}
 
 lookup :: VM.Storable a => SparseSetStorable a -> Word32 -> IO (Maybe a)
-lookup (SparseSetStorable sparse _ denseRef _) i = do
+lookup (SparseSetStorable sparse _ dense _) i = do
   index <- VPM.unsafeRead sparse (fromIntegral i)
   if index /= maxBound
-    then readIORef denseRef >>= \dense -> Just <$> VM.unsafeRead dense (fromIntegral index)
+    then Just <$> VM.unsafeRead dense (fromIntegral index)
     else pure Nothing
 {-# INLINE lookup #-}
 
 unsafeLookup :: VM.Storable a => SparseSetStorable a -> Word32 -> IO a
-unsafeLookup (SparseSetStorable sparse _ denseRef _) i = do
+unsafeLookup (SparseSetStorable sparse _ dense _) i = do
   index <- VPM.unsafeRead sparse (fromIntegral i)
-  readIORef denseRef >>= \dense -> VM.unsafeRead dense (fromIntegral index)
+  VM.unsafeRead dense (fromIntegral index)
 {-# INLINE unsafeLookup #-}
 
 remove :: VM.Storable a => SparseSetStorable a -> Word32 -> IO ()
-remove (SparseSetStorable sparse entitiesRef denseRef sizeRef) i = do
+remove (SparseSetStorable sparse entities dense sizeRef) i = do
   index <- VPM.unsafeRead sparse (fromIntegral i)
   if index == maxBound
     then pure ()
     else do
-      dense <- readIORef denseRef
-      entities <- readIORef entitiesRef
-      lastDenseIndex <- atomicModifyIORef' sizeRef (\x -> (pred x, pred x))
+      lastDenseIndex <- atomicModifyIORef sizeRef $ \size -> (pred size, pred size)
 
       lastElement <- VM.unsafeRead dense lastDenseIndex
       lastKey <- VPM.unsafeRead entities lastDenseIndex
@@ -109,11 +107,9 @@ remove (SparseSetStorable sparse entitiesRef denseRef sizeRef) i = do
 {-# INLINE remove #-}
 
 for :: (MonadIO m, VM.Storable a) => SparseSetStorable a -> (Word32 -> a -> m ()) -> m ()
-for (SparseSetStorable _ entitiesRef denseRef sizeRef) f = do
-  entities <- liftIO $ readIORef entitiesRef
-  dense <- liftIO $ readIORef denseRef
-
+for (SparseSetStorable _ entities dense sizeRef) f = do
   size <- liftIO $ readIORef sizeRef
+
   forM_ [0 .. pred size] $ \i -> do
     key <- liftIO $ VPM.unsafeRead entities i
     val <- liftIO $ VM.unsafeRead dense i
@@ -122,10 +118,10 @@ for (SparseSetStorable _ entitiesRef denseRef sizeRef) f = do
 {-# INLINE for #-}
 
 visualize :: SparseSetStorable a -> IO ()
-visualize (SparseSetStorable sparse entities _ sizeRef) = do
+visualize (SparseSetStorable sparse entities sense sizeRef) = do
   size <- readIORef sizeRef
   putStrLn $ "SparseSet (" <> show size <> ")"
   putStr "Sparse: "
   VP.freeze sparse >>= print
   putStr "Dense: "
-  readIORef entities >>= VP.freeze >>= print
+  VP.freeze entities >>= print

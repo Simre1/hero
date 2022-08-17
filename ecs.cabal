@@ -22,16 +22,18 @@ maintainer:         simre4775@gmail.com
 extra-source-files: CHANGELOG.md
 
 library
-    build-depends:    base >4.13.0.0, vector > 0.13, transformers, unliftio, containers, template-haskell
+    build-depends:    base >4.13.0.0, vector > 0.12, transformers, unliftio, containers, template-haskell, ghc-prim, deepseq
     hs-source-dirs:   src
     exposed-modules:
         Data.SparseSet.Unboxed,
         Data.SparseSet.Storable,
         Data.SparseSet.NoComponent,
+        Data.SparseSet.Prim,
+
         Hex.Internal.World,
         Hex.Internal.Component,
         Hex.Internal.Component.ComponentId,
-
+        Hex.Internal.Component.Data
         Hex.Internal.Entity,
         Hex.Internal.System,
         Hex.Internal.Component.SparseSet
@@ -40,19 +42,28 @@ library
     default-extensions:
         DataKinds
         TypeFamilies
+        Strict
+        MagicHash
     ghc-options: -O2
 
 test-suite ecs
     type: exitcode-stdio-1.0
     main-is: Main.hs
-    build-depends:    base >4.13.0.0, ecs, tasty, tasty-hunit
+    build-depends:    base >4.13.0.0, ecs, tasty, tasty-hunit, derive-storable, derive-storable-plugin
     hs-source-dirs:   test
     default-language: GHC2021
 
-executable bench
+executable hex-bench
     main-is: Main.hs
     build-depends:    base >4.13.0.0, ecs, tasty, tasty-bench, transformers, derive-storable, derive-storable-plugin
-    hs-source-dirs:   bench
+    hs-source-dirs:   bench/hex
+    default-language: GHC2021
+    ghc-options: -O2
+
+executable apecs-bench
+    main-is: Main.hs
+    build-depends:    base >4.13.0.0, tasty, tasty-bench, apecs
+    hs-source-dirs:   bench/apecs
     default-language: GHC2021
     ghc-options: -O2
 

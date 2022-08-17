@@ -17,10 +17,15 @@ import Hex.Internal.Component.ComponentId
 import Hex.Internal.Entity
 import Type.Reflection
 import Unsafe.Coerce
+import Data.SparseSet.Storable
+import qualified Data.SparseSet.Storable as SV
+import Data.Coerce
+import Data.Vector.Storable (Storable)
+
 
 newtype ComponentId = ComponentId {unwrapComponentId :: Int} deriving (Show)
 
-class Typeable component => Component component where
+class (Storable component, Typeable component) => Component component where
   componentStorage :: MaxEntities -> IO (Store component)
 
 newtype WrappedStorage = WrappedStorage (forall component. Store component)
@@ -36,8 +41,11 @@ class StoreClass store component where
   storeClassFor :: store component -> (Entity -> component -> IO ()) -> IO ()
   storeClassMembers :: store component -> IO Int
 
-data Store component where
-  Store :: StoreClass store component => store component -> Store component
+-- data Store component where
+--   Store :: StoreClass store component => store component -> Store component
+
+newtype Store component = Store (SparseSetStorable component)
+
 
 data Stores = Stores (IORef (V.IOVector WrappedStorage)) (IORef (M.Map SomeTypeRep ComponentId))
 
@@ -84,20 +92,22 @@ getComponentId stores@(Stores _ mappingsRef) max = do
 newStores :: IO Stores
 newStores = Stores <$> (V.new 10 >>= newIORef) <*> newIORef M.empty
 
-storeContains :: forall component. Store component -> Entity -> IO Bool
-storeGet :: forall component. Store component -> Entity -> IO component
-storePut :: forall component. Store component -> Entity -> component -> IO ()
-storeDelete :: forall component. Store component -> Entity -> IO ()
-storeFor :: forall component. Store component -> (Entity -> component -> IO ()) -> IO ()
-storeMembers :: forall component. Store component -> IO Int
-storeContains (Store store) = storeClassContains store
+storeContains :: forall component. Storable component => Store component -> Entity -> IO Bool
+storeGet :: forall component. Storable component => Store component -> Entity -> IO component
+storePut :: forall component. Storable component => Store component -> Entity -> component -> IO ()
+storeDelete :: forall component. Storable component => Store component -> Entity -> IO ()
+storeFor :: forall component. Storable component => Store component -> (Entity -> component -> IO ()) -> IO ()
+storeMembers :: forall component. Storable component => Store component -> IO Int
+storeContains (Store set) entity = SV.contains set (coerce entity)
+storeGet (Store set) entity = SV.unsafeLookup set (coerce entity)
+storePut (Store set) entity val = SV.insert set (coerce entity) val
+storeDelete (Store set) entity = SV.remove set (coerce entity)
+storeFor (Store set) f = SV.for set (coerce f)
+storeMembers (Store set) = SV.size set
+{-# INLINE storeContains #-}
+{-# INLINE storeGet #-}
+{-# INLINE storePut #-}
+{-# INLINE storeDelete #-}
+{-# INLINE storeFor #-}
 
-storeGet (Store store) = storeClassGet store
-
-storePut (Store store) = storeClassPut store
-
-storeDelete (Store store) = storeClassDelete store
-
-storeFor (Store store) = storeClassFor store
-
-storeMembers (Store store) = storeClassMembers store
+{-# INLINE storeMembers #-}

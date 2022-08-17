@@ -12,8 +12,8 @@ import qualified Data.SparseSet.Storable as SV
 
 unboxedSet :: Unbox component => MaxEntities -> IO (Store component)
 unboxedSet (MaxEntities entities) = do
-  set <- SU.create entities (entities `quot` 3)
-  pure $ Store set
+  -- set <- SU.create entities (entities `quot` 3)
+  pure $ Store $ undefined
 
 instance Unbox a => StoreClass SU.SparseSetUnboxed a where
   storeClassContains set entity = SU.contains set (coerce entity)
@@ -35,9 +35,9 @@ instance Storable a => StoreClass SV.SparseSetStorable a where
   storeClassDelete set entity = SV.remove set (coerce entity)
   storeClassFor set f = SV.for set (coerce f)
   storeClassMembers set = SV.size set
-  -- {-# INLINE storeClassContains #-}
-  -- {-# INLINE storeClassGet #-}
-  -- {-# INLINE storeClassPut #-}
-  -- {-# INLINE storeClassDelete #-}
-  -- {-# INLINE storeClassFor #-}
-  -- {-# INLINE storeClassMembers #-}      
+  {-# INLINE storeClassContains #-}
+  {-# INLINE storeClassGet #-}
+  {-# INLINE storeClassPut #-}
+  {-# INLINE storeClassDelete #-}
+  {-# INLINE storeClassFor #-}
+  {-# INLINE storeClassMembers #-}      
