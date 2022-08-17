@@ -13,10 +13,12 @@ import Data.IORef
   )
 import Data.Kind (Type)
 import Data.Map qualified as M
+import Data.Maybe (fromMaybe)
 import Data.Proxy (Proxy (Proxy))
 import Data.Vector.Mutable qualified as V
 import Data.Vector.Storable (Storable)
-import Hex.Entity (Entity, MaxEntities)
+import Data.Word (Word32)
+import Hex.Entity (Entity, MaxEntities (MaxEntities))
 import Type.Reflection (SomeTypeRep, Typeable, someTypeRep)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -24,17 +26,22 @@ newtype ComponentId = ComponentId {unwrapComponentId :: Int} deriving (Show)
 
 class (ComponentStore component (Store component), Typeable component) => Component component where
   type Store component :: Type -> Type
+  liveEntities :: Maybe Word32
+  liveEntities = Nothing
 
 type Store' component = Store component component
 
+data MakeStore = MakeStore {maxGlobalEntities :: Word32, maxComponentEntities :: Word32}
+
 class ComponentStore component store where
-  makeStore :: MaxEntities -> IO (store component)
+  makeStore :: MakeStore -> IO (store component)
   storeContains :: store component -> Entity -> IO Bool
   storeGet :: store component -> Entity -> IO component
   storePut :: store component -> Entity -> component -> IO ()
   storeDelete :: store component -> Entity -> IO ()
   storeFor :: store component -> (Entity -> component -> IO ()) -> IO ()
   storeMembers :: store component -> IO Int
+
 
 newtype WrappedStorage = WrappedStorage (forall component. Store' component)
 
@@ -65,8 +72,8 @@ addStore (Stores storeVecRef mappingsRef) store = do
     Just i -> V.unsafeWrite storeVec (unwrapComponentId i) wrappedStore *> pure i
 
 addComponentStore :: forall component. (Component component) => Stores -> MaxEntities -> IO ComponentId
-addComponentStore stores@(Stores storeVec mappings) max = do
-  store <- makeStore @component max
+addComponentStore stores@(Stores storeVec mappings) (MaxEntities max) = do
+  store <- makeStore @component $ MakeStore max (fromMaybe max (liveEntities @component))
   addStore @component stores store
 
 getStore :: forall component. Stores -> ComponentId -> IO (Store' component)
@@ -74,12 +81,12 @@ getStore (Stores storeVecRef _) componentId =
   readIORef storeVecRef >>= \vec -> unwrapWrappedStorage @component <$> V.unsafeRead vec (unwrapComponentId componentId)
 
 getComponentId :: forall component. (ComponentStore component (Store component), Component component) => Stores -> MaxEntities -> IO ComponentId
-getComponentId stores@(Stores _ mappingsRef) max = do
+getComponentId stores@(Stores _ mappingsRef) (MaxEntities max) = do
   maybeComponent <- M.lookup (someTypeRep $ Proxy @component) <$> readIORef mappingsRef
   case maybeComponent of
     Just componentId -> pure componentId
     Nothing -> do
-      store <- makeStore @component max
+      store <- makeStore @component $ MakeStore max (fromMaybe max (liveEntities @component))
       componentId <- addStore @component stores store
       pure componentId
 

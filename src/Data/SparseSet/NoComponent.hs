@@ -40,15 +40,8 @@ insert (SparseSetNoComponent sparse entities sizeRef) i = do
     then pure ()
     else do
       nextIndex <- atomicModifyIORef' sizeRef (\size -> (succ size, size))
-      let entitiesSize = VPM.length entities
-      if (nextIndex >= entitiesSize)
-        then do
-          newEntities <- VPM.unsafeGrow entities (entitiesSize `quot` 2)
-          VPM.unsafeWrite newEntities nextIndex i
-          VPM.unsafeWrite sparse (fromIntegral i) (fromIntegral nextIndex)
-        else do
-          VPM.unsafeWrite entities nextIndex i
-          VPM.unsafeWrite sparse (fromIntegral i) (fromIntegral nextIndex)
+      VPM.unsafeWrite entities nextIndex i
+      VPM.unsafeWrite sparse (fromIntegral i) (fromIntegral nextIndex)
 {-# INLINE insert #-}
 
 contains :: SparseSetNoComponent -> Word32 -> IO Bool

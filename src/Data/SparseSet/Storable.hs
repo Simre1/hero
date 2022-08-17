@@ -9,6 +9,7 @@ module Data.SparseSet.Storable
     remove,
     for,
     visualize,
+    growDense
   )
 where
 
@@ -21,8 +22,6 @@ import Data.Vector.Storable qualified as V
 import Data.Vector.Storable.Mutable qualified as VM
 import Data.Word
 import Prelude hiding (lookup)
-
--- newtype SparseSetStorable a = SparseSetStorable (IORef (SparseSetStorable' a))
 
 data SparseSetStorable a = SparseSetStorable
   { sparseSetSparse :: {-# UNPACK #-} !(VPM.IOVector Word32),
@@ -40,7 +39,6 @@ create sparseSize denseSize = do
   SparseSetStorable sparse entities dense <$> newIORef size
 {-# INLINE create #-}
 
-
 insert :: (VM.Storable a) => SparseSetStorable a -> Word32 -> a -> IO ()
 insert (SparseSetStorable sparse entities dense sizeRef) i a = do
   index <- VPM.unsafeRead sparse (fromIntegral i)
@@ -49,16 +47,6 @@ insert (SparseSetStorable sparse entities dense sizeRef) i a = do
     else do
       nextIndex <- atomicModifyIORef' sizeRef (\size -> (succ size, size))
       let denseSize = VM.length dense
-
-      -- if (nextIndex >= denseSize)
-      --   then do
-      --     newDense <- VM.unsafeGrow dense (denseSize `quot` 2)
-      --     newEntities <- VPM.unsafeGrow entities (denseSize `quot` 2)
-      --     VM.unsafeWrite newDense nextIndex a
-      --     VPM.unsafeWrite newEntities nextIndex i
-      --     VPM.unsafeWrite sparse (fromIntegral i) (fromIntegral nextIndex)
-      --     writeSet set $ SparseSetStorable' sparse newEntities newDense (size + 1)
-      --   else do
       VM.unsafeWrite dense nextIndex a
       VPM.unsafeWrite entities nextIndex i
       VPM.unsafeWrite sparse (fromIntegral i) (fromIntegral nextIndex)
@@ -116,6 +104,13 @@ for (SparseSetStorable _ entities dense sizeRef) f = do
 
     f key val
 {-# INLINE for #-}
+
+growDense :: VM.Storable a => SparseSetStorable a -> IO (SparseSetStorable a)
+growDense (SparseSetStorable sparse entities dense sizeRef) = do
+  let entitySize = VPM.length entities
+  newDense <- VM.unsafeGrow dense (entitySize `quot` 2)
+  newEntities <- VPM.unsafeGrow entities (entitySize `quot` 2)
+  pure $ SparseSetStorable sparse newEntities newDense sizeRef
 
 visualize :: SparseSetStorable a -> IO ()
 visualize (SparseSetStorable sparse entities sense sizeRef) = do

@@ -28,18 +28,12 @@ import Data.Monoid
   )
 import Hex.Component
   ( Component,
-    ComponentStore
-      ( storeContains,
-        storeDelete,
-        storeFor,
-        storeGet,
-        storeMembers,
-        storePut
-      ),
+    ComponentStore(..),
+      addStore
   )
 import Hex.Entity (Entity, entityAmount, forEntities)
 import Hex.World
-  ( World (worldEntities),
+  ( World (worldEntities, worldStores),
     worldComponent,
     worldNewEntity,
   )
@@ -279,7 +273,9 @@ instance QueryComponent False Entity where
 instance Component a => QueryComponent True a where
   queryContains w = worldComponent @a w <&> \s !e -> storeContains s e
   queryGet w = worldComponent @a w <&> \s !e -> storeGet s e
-  queryPut w = worldComponent w <&> \s !e c -> storePut s e c
+  queryPut w = do
+    -- let replace newStore = print "resize" >> addStore (worldStores w) newStore *> pure ()
+    worldComponent w <&> \s !e c -> storePut s e c
   queryDelete w = worldComponent @a w <&> \s !e -> storeDelete s e
   queryFor w = worldComponent @a w <&> \s f -> storeFor s f
   queryMembers w = worldComponent @a w <&> storeMembers
