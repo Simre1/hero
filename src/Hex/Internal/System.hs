@@ -1,23 +1,48 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ApplicativeDo #-}
-
+{-# LANGUAGE UndecidableInstances #-}
 
 module Hex.Internal.System where
 
-import Control.Arrow
-import Control.Category
-import Control.Monad (when, (<$!>))
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Reader
-import Data.Coerce
-import Data.Functor
+import Control.Arrow (Arrow (arr, (***)))
+import Control.Category (Category (..))
+import Control.Monad
+  ( Monad ((>>=)),
+    void,
+    when,
+    (<$!>),
+  )
+import Data.Coerce (Coercible, coerce)
+import Data.Functor ((<$>), (<&>))
 import Data.IORef
+  ( modifyIORef,
+    modifyIORef',
+    newIORef,
+    readIORef,
+  )
 import Data.Monoid
+  ( Dual (Dual, getDual),
+    Endo (Endo, appEndo),
+    Monoid (mempty),
+    (<>),
+  )
 import Hex.Internal.Component
-import Hex.Internal.Entity
+  ( Component,
+    ComponentStore
+      ( storeContains,
+        storeDelete,
+        storeFor,
+        storeGet,
+        storeMembers,
+        storePut
+      ),
+  )
+import Hex.Internal.Entity (Entity, entityAmount, forEntities)
 import Hex.Internal.World
-import Language.Haskell.TH
+  ( World (worldEntities),
+    worldComponent,
+    worldNewEntity,
+  )
 import Prelude hiding (id, (.))
 
 newtype System m i o = System (World -> m (i -> m o))
@@ -59,7 +84,6 @@ arrM :: Applicative m => (a -> m b) -> System m a b
 arrM f = System $ \_ -> pure $ f
 {-# INLINE arrM #-}
 
-
 compileSystem :: System IO i o -> World -> IO (i -> IO o)
 compileSystem (System f) w = f w
 {-# INLINE compileSystem #-}
@@ -89,6 +113,7 @@ cmapM f =
 cfold :: forall a o m. (Monoid o, QC a) => (a -> o) -> System IO () o
 cfold f = System $ \w -> do
   for <- queryFor @(S a) @a w
+  members <- queryMembers @(S a) @a w
   pure $! \i2 -> do
     ref <- newIORef (mempty :: o)
     for $! \e a -> do
@@ -123,11 +148,50 @@ newEntity = System $ \w -> do
     pure e
 {-# INLINE newEntity #-}
 
--- queryExec :: (QC i, QC o) => Query IO i o -> System IO () ()
--- queryExec (Query makeQ) = System $ \w -> do
---   q <- makeQ w
---   for <- queryFor @(S i) @i w
---   pure $ \_ -> for
+queryExec :: forall i1 i2 o. (QC i1, Monoid o) => Query IO (i1, i2) o -> System IO i2 o
+queryExec (Query makeQ) = System $ \w -> do
+  q <- makeQ w
+  for <- queryFor @(S i1) @i1 w
+  pure $ \i2 -> do
+    ref <- newIORef (mempty :: o)
+    for $! \e i1 -> do
+      o <- q e (i1, i2)
+      modifyIORef' ref (<> o)
+    readIORef ref
+{-# INLINE queryExec #-}
+
+queryExec_ :: forall i o. (QC i) => Query IO i o -> System IO () ()
+queryExec_ (Query makeQ) = System $ \w -> do
+  q <- makeQ w
+  for <- queryFor @(S i) @i w
+  pure $ \_ -> for (fmap (fmap void) q)
+{-# INLINE queryExec_ #-}
+
+querySingle_ :: forall i o. (QC i) => Query IO i o -> World -> IO (Entity -> IO ())
+querySingle_ (Query makeQ) w = do
+  q <- makeQ w
+  getValues <- queryGet @(S i) @i w
+  contains <- queryContains @(S i) @i w
+  pure $ \e -> do
+    whenIO (contains e) $ do
+      values <- getValues e
+      q e values
+      pure ()
+{-# INLINE querySingle_ #-}
+
+querySingle :: forall i1 i2 o. (QC i1) => Query IO (i1, i2) o -> World -> IO (Entity -> i2 -> IO (Maybe o))
+querySingle (Query makeQ) w = do
+  q <- makeQ w
+  getValues <- queryGet @(S i1) @i1 w
+  contains <- queryContains @(S i1) @i1 w
+  pure $ \e i2 -> do
+    c <- (contains e)
+    if c
+      then do
+        values <- getValues e
+        Just <$> q e (values, i2)
+      else pure Nothing
+{-# INLINE querySingle #-}
 
 newtype Query m i o = Query (World -> IO (Entity -> i -> IO o))
 
@@ -185,6 +249,23 @@ instance QueryComponent False () where
   queryDelete w = pure $! \_ -> pure ()
   queryFor w = do
     pure $! \f -> forEntities (worldEntities w) $! \e -> f e ()
+  queryMembers w = do
+    pure $! entityAmount (worldEntities w)
+
+  {-# INLINE queryContains #-}
+  {-# INLINE queryGet #-}
+  {-# INLINE queryPut #-}
+  {-# INLINE queryDelete #-}
+  {-# INLINE queryFor #-}
+  {-# INLINE queryMembers #-}
+
+instance QueryComponent False Entity where
+  queryContains w = pure $! \_ -> pure True
+  queryGet w = pure $! \e -> pure e
+  queryPut w = pure $! \_ _ -> pure ()
+  queryDelete w = pure $! \_ -> pure ()
+  queryFor w = do
+    pure $! \f -> forEntities (worldEntities w) $! \e -> f e e
   queryMembers w = do
     pure $! entityAmount (worldEntities w)
 

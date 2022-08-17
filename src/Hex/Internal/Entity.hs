@@ -3,8 +3,8 @@ import Data.Word
 
 import qualified Data.Vector.Unboxed.Mutable as VU
 import qualified Data.SparseSet.NoComponent as S
-import Data.IORef
-import Data.Coerce
+import Data.IORef ( newIORef, readIORef, writeIORef, IORef )
+import Data.Coerce ( coerce )
 
 newtype Entity = Entity Word32
 
