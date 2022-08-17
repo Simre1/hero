@@ -15,6 +15,7 @@ import Hex.Internal.Component.SparseSet
 import Hex.Internal.World
 import Test.Tasty.Bench
 import Control.Arrow
+import qualified Data.SparseSet.Storable as SV
 
 data Position = Position {-# UNPACK #-} !Int {-# UNPACK #-} !Int deriving (Generic)
 
@@ -29,14 +30,13 @@ data Acceleration = Acceleration {-# UNPACK #-} !Int {-# UNPACK #-} !Int derivin
 instance GStorable Acceleration
 
 instance Component Position where
-  componentStorage = storedSet
+  type Store Position = SparseSetStorableStore
 
 instance Component Velocity where
-  componentStorage = storedSet
+  type Store Velocity = SparseSetStorableStore
 
 instance Component Acceleration where
-  componentStorage = storedSet
-
+  type Store Acceleration = SparseSetStorableStore
 
 main :: IO ()
 main = do

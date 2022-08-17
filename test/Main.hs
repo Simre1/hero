@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -fplugin=Foreign.Storable.Generic.Plugin #-}
-{-# LANGUAGE ApplicativeDo #-}
+{-# LANGUAGE TypeFamilies #-}
 
 
 module Main where
@@ -17,7 +17,7 @@ import Data.Monoid
 import GHC.Generics
 import Control.Arrow
 import Hex.Internal.Component
-import Hex.Internal.Component.SparseSet (storedSet)
+import Hex.Internal.Component.SparseSet
 
 data Position = Position {-# UNPACK #-} !Int deriving (Generic)
 
@@ -25,11 +25,13 @@ instance GStorable Position
 
 data Velocity = Velocity {-# UNPACK #-} !Int  deriving (Generic)
 
+
+
 instance Component Position where
-  componentStorage = storedSet
+  type Store Position = SparseSetStorableStore
 
 instance Component Velocity where
-  componentStorage = storedSet
+  type Store Velocity = SparseSetStorableStore
 
 instance GStorable Velocity
 

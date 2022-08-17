@@ -1,4 +1,4 @@
-module Hex.Internal.Component.SparseSet (Unbox, unboxedSet, Storable, storedSet) where
+module Hex.Internal.Component.SparseSet where
 
 import Control.Monad.IO.Class
 import Data.Coerce
@@ -10,34 +10,39 @@ import Hex.Internal.Entity
 import Data.Vector.Storable (Storable)
 import qualified Data.SparseSet.Storable as SV
 
-unboxedSet :: Unbox component => MaxEntities -> IO (Store component)
-unboxedSet (MaxEntities entities) = do
-  -- set <- SU.create entities (entities `quot` 3)
-  pure $ Store $ undefined
 
-instance Unbox a => StoreClass SU.SparseSetUnboxed a where
-  storeClassContains set entity = SU.contains set (coerce entity)
-  storeClassGet set entity = SU.unsafeLookup set (coerce entity)
-  storeClassPut set entity val = SU.insert set (coerce entity) val
-  storeClassDelete set entity = SU.remove set (coerce entity)
-  storeClassFor set f = SU.for set (coerce f)
-  storeClassMembers set = SU.size set
+newtype SparseSetUnboxedStore a = SparseSetUnboxedStore (SU.SparseSetUnboxed a)
 
-storedSet :: Storable component => MaxEntities -> IO (Store component)
-storedSet (MaxEntities entities) = do
-  set <- SV.create entities (entities `quot` 3)
-  pure $ Store set
+instance Unbox a => ComponentStore a SparseSetUnboxedStore where
+  storeContains (SparseSetUnboxedStore set) entity = SU.contains set (coerce entity)
+  storeGet (SparseSetUnboxedStore set) entity = SU.unsafeLookup set (coerce entity)
+  storePut (SparseSetUnboxedStore set) entity val = SU.insert set (coerce entity) val
+  storeDelete (SparseSetUnboxedStore set) entity = SU.remove set (coerce entity)
+  storeFor (SparseSetUnboxedStore set) f = SU.for set (coerce f)
+  storeMembers (SparseSetUnboxedStore set) = SU.size set
+  makeStore (MaxEntities entities) = SparseSetUnboxedStore <$> SU.create entities (entities `quot` 3)
+  {-# INLINE storeContains #-}
+  {-# INLINE storeGet #-}
+  {-# INLINE storePut #-}
+  {-# INLINE storeDelete #-}
+  {-# INLINE storeFor #-}
+  {-# INLINE storeMembers #-}        
 
-instance Storable a => StoreClass SV.SparseSetStorable a where
-  storeClassContains set entity = SV.contains set (coerce entity)
-  storeClassGet set entity = SV.unsafeLookup set (coerce entity)
-  storeClassPut set entity val = SV.insert set (coerce entity) val
-  storeClassDelete set entity = SV.remove set (coerce entity)
-  storeClassFor set f = SV.for set (coerce f)
-  storeClassMembers set = SV.size set
-  {-# INLINE storeClassContains #-}
-  {-# INLINE storeClassGet #-}
-  {-# INLINE storeClassPut #-}
-  {-# INLINE storeClassDelete #-}
-  {-# INLINE storeClassFor #-}
-  {-# INLINE storeClassMembers #-}      
+
+
+newtype SparseSetStorableStore a = SparseSetStorableStore (SV.SparseSetStorable a)
+
+instance Storable a => ComponentStore a SparseSetStorableStore where
+  storeContains (SparseSetStorableStore set) entity = SV.contains set (coerce entity)
+  storeGet (SparseSetStorableStore set) entity = SV.unsafeLookup set (coerce entity)
+  storePut (SparseSetStorableStore set) entity val = SV.insert set (coerce entity) val
+  storeDelete (SparseSetStorableStore set) entity = SV.remove set (coerce entity)
+  storeFor (SparseSetStorableStore set) f = SV.for set (coerce f)
+  storeMembers (SparseSetStorableStore set) = SV.size set
+  makeStore (MaxEntities entities) = SparseSetStorableStore <$> SV.create entities (entities `quot` 3)
+  {-# INLINE storeContains #-}
+  {-# INLINE storeGet #-}
+  {-# INLINE storePut #-}
+  {-# INLINE storeDelete #-}
+  {-# INLINE storeFor #-}
+  {-# INLINE storeMembers #-}      

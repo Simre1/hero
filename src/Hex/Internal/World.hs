@@ -22,7 +22,7 @@ worldComponentId :: forall component. Component component => Component component
 worldComponentId !w = getComponentId @component (worldStores w) (worldMaxEntities w)
 {-# INLINE worldComponentId #-}
 
-worldComponent :: forall component. Component component => Component component => World -> IO (Store component)
+worldComponent :: forall component. Component component => Component component => World -> IO (Store' component)
 worldComponent !w = getComponentId @component (worldStores w) (worldMaxEntities w) >>= getStore (worldStores w)
 {-# INLINE worldComponent #-}
 
