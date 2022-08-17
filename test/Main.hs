@@ -1,31 +1,25 @@
-{-# OPTIONS_GHC -fplugin=Foreign.Storable.Generic.Plugin #-}
 {-# LANGUAGE TypeFamilies #-}
-
+{-# OPTIONS_GHC -fplugin=Foreign.Storable.Generic.Plugin #-}
 
 module Main where
 
+import Control.Arrow
 import Data.Foldable (for_)
 import Data.Functor ((<&>))
-import qualified Data.SparseSet.Storable as S
+import Data.Monoid
+import Data.SparseSet.Storable qualified as S
 import Data.Traversable (for)
 import Foreign.Storable.Generic (GStorable)
-import Hex.System
-import Hex.World
+import GHC.Generics
+import Hex
 import Test.Tasty
 import Test.Tasty.HUnit (testCase, (@?))
-import Data.Monoid
-import GHC.Generics
-import Control.Arrow
-import Hex.Component
-import Hex.Component.SparseSet
 
 data Position = Position {-# UNPACK #-} !Int deriving (Generic)
 
 instance GStorable Position
 
-data Velocity = Velocity {-# UNPACK #-} !Int  deriving (Generic)
-
-
+data Velocity = Velocity {-# UNPACK #-} !Int deriving (Generic)
 
 instance Component Position where
   type Store Position = SparseSetStorableStore
@@ -47,14 +41,14 @@ ecs =
         init <- compileSystem (for_ [0 .. 999] (\_ -> pure (Position 0, Velocity 1) >>> newEntity)) w
         init ()
         let system =
-              cmap (\(Position x, Velocity v) -> Position (x + v)) *>
-              cmap (\(Velocity v) -> Velocity (v + 1)) *>
-              cfold (\(Position x) -> Sum x)
+              cmap (\(Position x, Velocity v) -> Position (x + v))
+                *> cmap (\(Velocity v) -> Velocity (v + 1))
+                *> cfold (\(Position x) -> Sum x)
         runSystem <- compileSystem system w
         result <- runSystem ()
-        (== Sum 1000) result @? "Result is false" 
+        (== Sum 1000) result @? "Result is false"
         result <- runSystem ()
-        (== Sum 3000) result @? "Result is false" 
+        (== Sum 3000) result @? "Result is false"
     ]
 
 sparseSet :: TestTree

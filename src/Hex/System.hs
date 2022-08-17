@@ -77,9 +77,9 @@ instance Applicative m => Applicative (System m i) where
   {-# INLINE pure #-}
   {-# INLINE (<*>) #-}
 
-arrM :: Applicative m => (a -> m b) -> System m a b
-arrM f = System $ \_ -> pure $ f
-{-# INLINE arrM #-}
+liftSystem :: Applicative m => (a -> m b) -> System m a b
+liftSystem f = System $ \_ -> pure $ f
+{-# INLINE liftSystem #-}
 
 compileSystem :: System IO i o -> World -> IO (i -> IO o)
 compileSystem (System f) w = f w
@@ -145,8 +145,8 @@ newEntity = System $ \w -> do
     pure e
 {-# INLINE newEntity #-}
 
-queryExec :: forall i1 i2 o. (QCI i1, Monoid o) => Query IO (i1, i2) o -> System IO i2 o
-queryExec (Query makeQ) = System $ \w -> do
+runQuery :: forall i1 i2 o. (QCI i1, Monoid o) => Query IO (i1, i2) o -> System IO i2 o
+runQuery (Query makeQ) = System $ \w -> do
   q <- makeQ w
   for <- queryFor @(S i1) @i1 w
   pure $ \i2 -> do
@@ -155,17 +155,17 @@ queryExec (Query makeQ) = System $ \w -> do
       o <- q e (i1, i2)
       modifyIORef' ref (<> o)
     readIORef ref
-{-# INLINE queryExec #-}
+{-# INLINE runQuery #-}
 
-queryExec_ :: forall i o. (QCI i) => Query IO i o -> System IO () ()
-queryExec_ (Query makeQ) = System $ \w -> do
+runQuery_ :: forall i o. (QCI i) => Query IO i o -> System IO () ()
+runQuery_ (Query makeQ) = System $ \w -> do
   q <- makeQ w
   for <- queryFor @(S i) @i w
   pure $ \_ -> for (fmap (fmap void) q)
-{-# INLINE queryExec_ #-}
+{-# INLINE runQuery_ #-}
 
-querySingle_ :: forall i o. (QCG i) => Query IO i o -> World -> IO (Entity -> IO ())
-querySingle_ (Query makeQ) w = do
+singleQuery_ :: forall i o. (QCG i) => Query IO i o -> World -> IO (Entity -> IO ())
+singleQuery_ (Query makeQ) w = do
   q <- makeQ w
   getValues <- queryGet @(S i) @i w
   contains <- queryContains @(S i) @i w
@@ -174,10 +174,10 @@ querySingle_ (Query makeQ) w = do
       values <- getValues e
       q e values
       pure ()
-{-# INLINE querySingle_ #-}
+{-# INLINE singleQuery_ #-}
 
-querySingle :: forall i1 i2 o. (QCG i1) => Query IO (i1, i2) o -> World -> IO (Entity -> i2 -> IO (Maybe o))
-querySingle (Query makeQ) w = do
+singleQuery :: forall i1 i2 o. (QCG i1) => Query IO (i1, i2) o -> World -> IO (Entity -> i2 -> IO (Maybe o))
+singleQuery (Query makeQ) w = do
   q <- makeQ w
   getValues <- queryGet @(S i1) @i1 w
   contains <- queryContains @(S i1) @i1 w
@@ -188,9 +188,12 @@ querySingle (Query makeQ) w = do
         values <- getValues e
         Just <$> q e (values, i2)
       else pure Nothing
-{-# INLINE querySingle #-}
+{-# INLINE singleQuery #-}
 
 newtype Query m i o = Query (World -> IO (Entity -> i -> IO o))
+
+liftQuery :: (a -> IO b) -> Query IO a b
+liftQuery f = Query $ \_ -> pure $ \_ a -> f a
 
 instance Applicative m => Category (Query m) where
   id = Query $ \_ -> pure $ \_ i -> pure i

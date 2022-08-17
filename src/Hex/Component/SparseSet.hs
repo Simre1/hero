@@ -19,22 +19,30 @@ import Hex.Entity
     MaxEntities (MaxEntities),
   )
 
--- newtype SparseSetUnboxedStore a = SparseSetUnboxedStore (SU.SparseSetUnboxed a)
+newtype SparseSetUnboxedStore a = SparseSetUnboxedStore (SU.SparseSetUnboxed a)
 
--- instance Unbox a => ComponentStore a SparseSetUnboxedStore where
---   storeContains (SparseSetUnboxedStore set) entity = SU.contains set (coerce entity)
---   storeGet (SparseSetUnboxedStore set) entity = SU.unsafeLookup set (coerce entity)
---   storePut (SparseSetUnboxedStore set) entity val = SU.insert set (coerce entity) val
---   storeDelete (SparseSetUnboxedStore set) entity = SU.remove set (coerce entity)
---   storeFor (SparseSetUnboxedStore set) f = SU.for set (coerce f)
---   storeMembers (SparseSetUnboxedStore set) = SU.size set
---   makeStore (MakeStore global component) = SparseSetUnboxedStore <$> SU.create global component
---   {-# INLINE storeContains #-}
---   {-# INLINE storeGet #-}
---   {-# INLINE storePut #-}
---   {-# INLINE storeDelete #-}
---   {-# INLINE storeFor #-}
---   {-# INLINE storeMembers #-}
+instance (Unbox a) => ComponentGet a SparseSetUnboxedStore where
+  storeContains (SparseSetUnboxedStore set) entity = SU.contains set (coerce entity)
+  storeGet (SparseSetUnboxedStore set) entity = SU.unsafeLookup set (coerce entity)
+  {-# INLINE storeContains #-}
+  {-# INLINE storeGet #-}
+
+instance (Unbox a) => ComponentPut a SparseSetUnboxedStore where
+  storePut (SparseSetUnboxedStore set) entity val = SU.insert set (coerce entity) val
+  {-# INLINE storePut #-}
+
+instance (Unbox a) => ComponentDelete a SparseSetUnboxedStore where
+  storeDelete (SparseSetUnboxedStore set) entity = SU.remove set (coerce entity)
+  {-# INLINE storeDelete #-}
+
+instance (Unbox a) => ComponentIterate a SparseSetUnboxedStore where
+  storeFor (SparseSetUnboxedStore set) f = SU.for set (coerce f)
+  storeMembers (SparseSetUnboxedStore set) = SU.size set
+  {-# INLINE storeFor #-}
+  {-# INLINE storeMembers #-}
+
+instance (Unbox a) => ComponentMakeStore a SparseSetUnboxedStore where
+  makeStore (MakeStore global component) = SparseSetUnboxedStore <$> SU.create global component
 
 newtype SparseSetStorableStore a = SparseSetStorableStore (SV.SparseSetStorable a)
 

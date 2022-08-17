@@ -29,7 +29,7 @@ library
         Data.SparseSet.Storable,
         Data.SparseSet.NoComponent,
         Data.SparseSet.Prim,
-
+        Hex,
         Hex.World,
         Hex.Component,
         Hex.Entity,
