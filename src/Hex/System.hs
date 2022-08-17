@@ -27,9 +27,12 @@ import Data.Monoid
     (<>),
   )
 import Hex.Component
-  ( Component,
-    ComponentStore(..),
-      addStore
+  ( Component (Store),
+    ComponentDelete (..),
+    ComponentGet (..),
+    ComponentIterate (..),
+    ComponentPut (..),
+    addStore,
   )
 import Hex.Entity (Entity, entityAmount, forEntities)
 import Hex.World
@@ -84,7 +87,7 @@ compileSystem (System f) w = f w
 
 cmap ::
   forall a b m.
-  (QC a, QC b) =>
+  (QCI a, QCP b) =>
   (a -> b) ->
   System IO () ()
 cmap f =
@@ -95,7 +98,7 @@ cmap f =
         pure $ \_ -> for $ \e a -> put e $! (f a)
     )
 
-cmapM :: forall a b m. (QC a, QC b) => (a -> IO b) -> System IO () ()
+cmapM :: forall a b m. (QCI a, QCP b) => (a -> IO b) -> System IO () ()
 cmapM f =
   System
     ( \w -> do
@@ -104,7 +107,7 @@ cmapM f =
         pure $ \_ -> for $ \e a -> f a >>= put e
     )
 
-cfold :: forall a o m. (Monoid o, QC a) => (a -> o) -> System IO () o
+cfold :: forall a o m. (Monoid o, QCI a) => (a -> o) -> System IO () o
 cfold f = System $ \w -> do
   for <- queryFor @(S a) @a w
   members <- queryMembers @(S a) @a w
@@ -115,7 +118,7 @@ cfold f = System $ \w -> do
       modifyIORef' ref (<> o)
     readIORef ref
 
-cfoldM :: forall a o m. (Monoid o, QC a) => (a -> IO o) -> System IO () o
+cfoldM :: forall a o m. (Monoid o, QCI a) => (a -> IO o) -> System IO () o
 cfoldM f = System $ \w -> do
   for <- queryFor @(S a) @a w
   pure $! \i2 -> do
@@ -125,15 +128,15 @@ cfoldM f = System $ \w -> do
       modifyIORef ref (<> o)
     readIORef ref
 
-cfoldr :: (QC a) => (a -> b -> b) -> b -> System IO () b
+cfoldr :: (QCI a) => (a -> b -> b) -> b -> System IO () b
 cfoldr f b = fmap (($! b) . appEndo) $! cfold $! Endo #. f
 {-# INLINE cfoldr #-}
 
-cfoldl :: (QC a) => (b -> a -> b) -> b -> System IO () b
+cfoldl :: (QCI a) => (b -> a -> b) -> b -> System IO () b
 cfoldl f b = fmap (($! b) . appEndo . getDual) $! cfold $! Dual . Endo . flip f
 {-# INLINE cfoldl #-}
 
-newEntity :: forall a. (QC a) => System IO a Entity
+newEntity :: forall a. (QCP a) => System IO a Entity
 newEntity = System $ \w -> do
   put <- queryPut @(S a) @a w
   pure $! \c -> do
@@ -142,7 +145,7 @@ newEntity = System $ \w -> do
     pure e
 {-# INLINE newEntity #-}
 
-queryExec :: forall i1 i2 o. (QC i1, Monoid o) => Query IO (i1, i2) o -> System IO i2 o
+queryExec :: forall i1 i2 o. (QCI i1, Monoid o) => Query IO (i1, i2) o -> System IO i2 o
 queryExec (Query makeQ) = System $ \w -> do
   q <- makeQ w
   for <- queryFor @(S i1) @i1 w
@@ -154,14 +157,14 @@ queryExec (Query makeQ) = System $ \w -> do
     readIORef ref
 {-# INLINE queryExec #-}
 
-queryExec_ :: forall i o. (QC i) => Query IO i o -> System IO () ()
+queryExec_ :: forall i o. (QCI i) => Query IO i o -> System IO () ()
 queryExec_ (Query makeQ) = System $ \w -> do
   q <- makeQ w
   for <- queryFor @(S i) @i w
   pure $ \_ -> for (fmap (fmap void) q)
 {-# INLINE queryExec_ #-}
 
-querySingle_ :: forall i o. (QC i) => Query IO i o -> World -> IO (Entity -> IO ())
+querySingle_ :: forall i o. (QCG i) => Query IO i o -> World -> IO (Entity -> IO ())
 querySingle_ (Query makeQ) w = do
   q <- makeQ w
   getValues <- queryGet @(S i) @i w
@@ -173,7 +176,7 @@ querySingle_ (Query makeQ) w = do
       pure ()
 {-# INLINE querySingle_ #-}
 
-querySingle :: forall i1 i2 o. (QC i1) => Query IO (i1, i2) o -> World -> IO (Entity -> i2 -> IO (Maybe o))
+querySingle :: forall i1 i2 o. (QCG i1) => Query IO (i1, i2) o -> World -> IO (Entity -> i2 -> IO (Maybe o))
 querySingle (Query makeQ) w = do
   q <- makeQ w
   getValues <- queryGet @(S i1) @i1 w
@@ -207,13 +210,13 @@ instance Applicative m => Arrow (Query m) where
   {-# INLINE arr #-}
   {-# INLINE (***) #-}
 
-qput :: forall i m. QC i => Query IO i ()
+qput :: forall i m. QCP i => Query IO i ()
 qput = Query $ \w -> do
   put <- queryPut @(S i) @i w
   pure put
 {-# INLINE qput #-}
 
-qdelete :: forall i m. QC i => Query IO i ()
+qdelete :: forall i m. QCD i => Query IO i ()
 qdelete = Query $ \w -> do
   delete <- queryDelete @(S i) @i w
   pure $! \e _ -> delete e
@@ -226,77 +229,105 @@ type family S a where
   S (a, b, c) = False
   S _ = True
 
-class QueryComponent (f :: Bool) components where
+class QueryGet (f :: Bool) components where
   queryContains :: World -> IO (Entity -> IO Bool)
   queryGet :: World -> IO (Entity -> IO components)
+
+class QueryPut (f :: Bool) components where
   queryPut :: World -> IO (Entity -> components -> IO ())
+
+class QueryDelete (f :: Bool) components where
   queryDelete :: World -> IO (Entity -> IO ())
+
+class QueryGet f components => QueryIterate (f :: Bool) components where
   queryFor :: World -> IO ((Entity -> components -> IO ()) -> IO ())
   queryMembers :: World -> IO (IO Int)
 
-type QC (a :: *) = QueryComponent (S a) a
+type QCG (a :: *) = QueryGet (S a) a
 
-instance QueryComponent False () where
+type QCP (a :: *) = QueryPut (S a) a
+
+type QCD (a :: *) = QueryDelete (S a) a
+
+type QCI (a :: *) = QueryIterate (S a) a
+
+instance QueryGet False () where
   queryContains w = pure $! \_ -> pure True
   queryGet w = pure $! \_ -> pure ()
+  {-# INLINE queryContains #-}
+  {-# INLINE queryGet #-}
+
+instance QueryPut False () where
   queryPut w = pure $! \_ _ -> pure ()
+  {-# INLINE queryPut #-}
+
+instance QueryDelete False () where
   queryDelete w = pure $! \_ -> pure ()
+  {-# INLINE queryDelete #-}
+
+instance QueryIterate False () where
   queryFor w = do
     pure $! \f -> forEntities (worldEntities w) $! \e -> f e ()
   queryMembers w = do
     pure $! entityAmount (worldEntities w)
-
-  {-# INLINE queryContains #-}
-  {-# INLINE queryGet #-}
-  {-# INLINE queryPut #-}
-  {-# INLINE queryDelete #-}
   {-# INLINE queryFor #-}
   {-# INLINE queryMembers #-}
 
-instance QueryComponent False Entity where
+instance QueryGet False Entity where
   queryContains w = pure $! \_ -> pure True
   queryGet w = pure $! \e -> pure e
-  queryPut w = pure $! \_ _ -> pure ()
-  queryDelete w = pure $! \_ -> pure ()
+  {-# INLINE queryContains #-}
+  {-# INLINE queryGet #-}
+
+instance QueryIterate False Entity where
   queryFor w = do
     pure $! \f -> forEntities (worldEntities w) $! \e -> f e e
   queryMembers w = do
     pure $! entityAmount (worldEntities w)
-
-  {-# INLINE queryContains #-}
-  {-# INLINE queryGet #-}
-  {-# INLINE queryPut #-}
-  {-# INLINE queryDelete #-}
   {-# INLINE queryFor #-}
   {-# INLINE queryMembers #-}
 
-instance Component a => QueryComponent True a where
+instance (Component a, ComponentGet a (Store a)) => QueryGet True a where
   queryContains w = worldComponent @a w <&> \s !e -> storeContains s e
   queryGet w = worldComponent @a w <&> \s !e -> storeGet s e
-  queryPut w = do
-    -- let replace newStore = print "resize" >> addStore (worldStores w) newStore *> pure ()
-    worldComponent w <&> \s !e c -> storePut s e c
-  queryDelete w = worldComponent @a w <&> \s !e -> storeDelete s e
-  queryFor w = worldComponent @a w <&> \s f -> storeFor s f
-  queryMembers w = worldComponent @a w <&> storeMembers
   {-# INLINE queryContains #-}
   {-# INLINE queryGet #-}
+
+instance (Component a, ComponentPut a (Store a)) => QueryPut True a where
+  queryPut w = worldComponent w <&> \s !e c -> storePut s e c
   {-# INLINE queryPut #-}
+
+instance (Component a, ComponentDelete a (Store a)) => QueryDelete True a where
+  queryDelete w = worldComponent @a w <&> \s !e -> storeDelete s e
   {-# INLINE queryDelete #-}
+
+instance (Component a, ComponentIterate a (Store a)) => QueryIterate True a where
+  queryFor w = worldComponent @a w <&> \s f -> storeFor s f
+  queryMembers w = worldComponent @a w <&> storeMembers
   {-# INLINE queryFor #-}
   {-# INLINE queryMembers #-}
 
-instance (QC a, QC b) => QueryComponent False (a, b) where
+instance (QCG a, QCG b) => QueryGet False (a, b) where
   queryContains w = (\p1 p2 e -> (&&) <$!> p1 e <*> p2 e) <$!> queryContains @(S a) @a w <*> queryContains @(S b) @b w
   queryGet w = (\f1 f2 e -> (,) <$!> f1 e <*> f2 e) <$!> queryGet @(S a) @a w <*> queryGet @(S b) @b w
+  {-# INLINE queryContains #-}
+  {-# INLINE queryGet #-}
+
+instance (QCP a, QCP b) => QueryPut False (a, b) where
   queryPut w = do
     putA <- queryPut @(S a) w
     putB <- queryPut @(S b) w
     pure $! \e (a, b) -> putA e a *> putB e b
+  {-# INLINE queryPut #-}
+
+instance (QCD a, QCD b) => QueryDelete False (a, b) where
   queryDelete w = do
     deleteA <- queryDelete @(S a) @a w
     deleteB <- queryDelete @(S b) @b w
     pure $! \e -> deleteA e *> deleteB e
+  {-# INLINE queryDelete #-}
+
+instance (QCI a, QCI b) => QueryIterate False (a, b) where
   queryFor w = do
     membersA <- queryMembers @(S a) @a w
     membersB <- queryMembers @(S b) @b w
@@ -324,14 +355,10 @@ instance (QC a, QC b) => QueryComponent False (a, b) where
     membersA <- queryMembers @(S a) @a w
     membersB <- queryMembers @(S b) @b w
     pure $! min <$!> membersA <*> membersB
-  {-# INLINE queryContains #-}
-  {-# INLINE queryGet #-}
-  {-# INLINE queryPut #-}
-  {-# INLINE queryDelete #-}
   {-# INLINE queryFor #-}
   {-# INLINE queryMembers #-}
 
-instance (QC a, QC b, QC c) => QueryComponent False (a, b, c) where
+instance (QCG a, QCG b, QCG c) => QueryGet False (a, b, c) where
   queryContains w = do
     containsA <- queryContains @(S a) @a w
     containsB <- queryContains @(S b) @b w
@@ -342,16 +369,26 @@ instance (QC a, QC b, QC c) => QueryComponent False (a, b, c) where
     getB <- queryGet @(S b) w
     getC <- queryGet @(S c) w
     pure $! \e -> (,,) <$!> getA e <*> getB e <*> getC e
+  {-# INLINE queryContains #-}
+  {-# INLINE queryGet #-}
+
+instance (QCP a, QCP b, QCP c) => QueryPut False (a, b, c) where
   queryPut w = do
     putA <- queryPut @(S a) w
     putB <- queryPut @(S b) w
     putC <- queryPut @(S c) w
     pure $! \e (a, b, c) -> putA e a *> putB e b *> putC e c
+  {-# INLINE queryPut #-}
+
+instance (QCD a, QCD b, QCD c) => QueryDelete False (a, b, c) where
   queryDelete w = do
     deleteA <- queryDelete @(S a) @a w
     deleteB <- queryDelete @(S b) @b w
     deleteC <- queryDelete @(S c) @c w
     pure $! \e -> deleteA e *> deleteB e *> deleteC e
+  {-# INLINE queryDelete #-}
+
+instance (QCI a, QCI b, QCI c) => QueryIterate False (a, b, c) where
   queryFor w = do
     membersA <- queryMembers @(S a) @a w
     membersB <- queryMembers @(S b) @b w
@@ -411,10 +448,7 @@ instance (QC a, QC b, QC c) => QueryComponent False (a, b, c) where
     membersB <- queryMembers @(S b) @b w
     membersC <- queryMembers @(S c) @c w
     pure $! (\a b c -> min (min a b) c) <$!> membersA <*> membersB <*> membersC
-  {-# INLINE queryContains #-}
-  {-# INLINE queryGet #-}
-  {-# INLINE queryPut #-}
-  {-# INLINE queryDelete #-}
+
   {-# INLINE queryFor #-}
   {-# INLINE queryMembers #-}
 

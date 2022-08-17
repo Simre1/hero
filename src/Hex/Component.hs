@@ -24,7 +24,7 @@ import Unsafe.Coerce (unsafeCoerce)
 
 newtype ComponentId = ComponentId {unwrapComponentId :: Int} deriving (Show)
 
-class (ComponentStore component (Store component), Typeable component) => Component component where
+class (ComponentMakeStore component (Store component), Typeable component) => Component component where
   type Store component :: Type -> Type
   liveEntities :: Maybe Word32
   liveEntities = Nothing
@@ -33,15 +33,22 @@ type Store' component = Store component component
 
 data MakeStore = MakeStore {maxGlobalEntities :: Word32, maxComponentEntities :: Word32}
 
-class ComponentStore component store where
+class ComponentMakeStore component store where
   makeStore :: MakeStore -> IO (store component)
+
+class ComponentGet component store where
   storeContains :: store component -> Entity -> IO Bool
   storeGet :: store component -> Entity -> IO component
+
+class ComponentPut component store where
   storePut :: store component -> Entity -> component -> IO ()
+
+class ComponentDelete component store where
   storeDelete :: store component -> Entity -> IO ()
+
+class ComponentGet component store => ComponentIterate component store where
   storeFor :: store component -> (Entity -> component -> IO ()) -> IO ()
   storeMembers :: store component -> IO Int
-
 
 newtype WrappedStorage = WrappedStorage (forall component. Store' component)
 
@@ -80,7 +87,7 @@ getStore :: forall component. Stores -> ComponentId -> IO (Store' component)
 getStore (Stores storeVecRef _) componentId =
   readIORef storeVecRef >>= \vec -> unwrapWrappedStorage @component <$> V.unsafeRead vec (unwrapComponentId componentId)
 
-getComponentId :: forall component. (ComponentStore component (Store component), Component component) => Stores -> MaxEntities -> IO ComponentId
+getComponentId :: forall component. (ComponentMakeStore component (Store component), Component component) => Stores -> MaxEntities -> IO ComponentId
 getComponentId stores@(Stores _ mappingsRef) (MaxEntities max) = do
   maybeComponent <- M.lookup (someTypeRep $ Proxy @component) <$> readIORef mappingsRef
   case maybeComponent of

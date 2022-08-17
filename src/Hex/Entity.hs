@@ -14,7 +14,7 @@ data Entities = Entities !S.SparseSetNoComponent !(IORef Word32)
 
 newEntities :: MaxEntities -> IO Entities
 newEntities (MaxEntities max) = do
-  set <- S.create max (max `quot` 3)
+  set <- S.create max max
   lastId <- newIORef 0
   pure $ Entities set lastId
 
