@@ -31,13 +31,5 @@ instance ComponentPut a Global where
   componentPut (Global ref) entity val = writeIORef ref val
   {-# INLINE componentPut #-}
 
-instance ComponentIterate a Global where
-  componentIterate entities (Global ref) f =
-    liftIO (readIORef ref)
-      >>= \a -> forEntities entities $ \e -> f e a
-  componentMembers entities (Global set) = entityAmount entities
-  {-# INLINE componentIterate #-}
-  {-# INLINE componentMembers #-}
-
 instance Default a => ComponentMakeStore a Global where
   componentMakeStore _ = makeGlobal def

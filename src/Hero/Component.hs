@@ -77,8 +77,8 @@ class ComponentDelete component store where
   componentDelete :: store component -> Entity -> IO ()
 
 class ComponentGet component store => ComponentIterate component store where
-  componentIterate :: MonadIO m => Entities -> store component -> (Entity -> component -> m ()) -> m ()
-  componentMembers :: Entities -> store component -> IO Int
+  componentIterate :: MonadIO m => store component -> (Entity -> component -> m ()) -> m ()
+  componentMembers :: store component -> IO Int
 
 newtype WrappedStorage = WrappedStorage (forall component. Store' component)
 

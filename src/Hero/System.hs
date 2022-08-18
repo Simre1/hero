@@ -72,7 +72,8 @@ instance Applicative m => Functor (System m i) where
 
 instance Applicative m => Applicative (System m i) where
   pure a = System $ \_ -> pure $ \_ -> pure a
-  -- | (<*>) might be automatically parallelized in the future. Use (>>>) for sequential code. 
+
+  -- (<*>) might be automatically parallelized in the future. Use (>>>) for sequential code.
   (System makeSF) <*> (System makeSV) = System $ \w -> do
     f <- makeSF w
     v <- makeSV w
@@ -351,8 +352,8 @@ instance (Component a, ComponentDelete a (Store a)) => QueryDelete True a where
   {-# INLINE queryDelete #-}
 
 instance (Component a, ComponentIterate a (Store a)) => QueryIterate True a where
-  queryFor w = worldComponent @a w <&> \s f -> componentIterate (worldEntities w) s f
-  queryMembers w = worldComponent @a w <&> componentMembers (worldEntities w)
+  queryFor w = worldComponent @a w <&> \s f -> componentIterate s f
+  queryMembers w = worldComponent @a w <&> componentMembers
   {-# INLINE queryFor #-}
   {-# INLINE queryMembers #-}
 

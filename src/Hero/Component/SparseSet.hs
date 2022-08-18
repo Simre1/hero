@@ -50,8 +50,8 @@ instance (Unbox a) => ComponentDelete a UnboxedSparseSet where
   {-# INLINE componentDelete #-}
 
 instance (Unbox a) => ComponentIterate a UnboxedSparseSet where
-  componentIterate entities (UnboxedSparseSet set) f = SU.for set (coerce f)
-  componentMembers entities (UnboxedSparseSet set) = SU.size set
+  componentIterate (UnboxedSparseSet set) f = SU.for set (coerce f)
+  componentMembers (UnboxedSparseSet set) = SU.size set
   {-# INLINE componentIterate #-}
   {-# INLINE componentMembers #-}
 
@@ -77,12 +77,12 @@ instance (Storable a) => ComponentDelete a StorableSparseSet where
   {-# INLINE componentDelete #-}
 
 instance (Storable a) => ComponentIterate a StorableSparseSet where
-  componentIterate entities (StorableSparseSet set) f = SV.for set (coerce f)
-  componentMembers entities (StorableSparseSet set) = SV.size set
+  componentIterate (StorableSparseSet set) f = SV.for set (coerce f)
+  componentMembers (StorableSparseSet set) = SV.size set
   {-# INLINE componentIterate #-}
   {-# INLINE componentMembers #-}
 
--- | Creates a storable sparse set. The first parameter should be the maximum amount of live entities (size of the sparse
+-- | Creates a storable sparse set. The first parameter should be the maximum amount of live (size of the sparse
 -- array) and the second should be the maximum amount of live entities for the component (size of the dense array).
 storableSparseSet :: Storable a => Word32 -> Word32 -> IO (StorableSparseSet a)
 storableSparseSet global component = StorableSparseSet <$> SV.create global component
@@ -109,8 +109,8 @@ instance (Storable a) => ComponentDelete a BoxedSparseSet where
   {-# INLINE componentDelete #-}
 
 instance (Storable a) => ComponentIterate a BoxedSparseSet where
-  componentIterate entities (BoxedSparseSet set) f = SB.for set (coerce f)
-  componentMembers entities (BoxedSparseSet set) = SB.size set
+  componentIterate (BoxedSparseSet set) f = SB.for set (coerce f)
+  componentMembers (BoxedSparseSet set) = SB.size set
   {-# INLINE componentIterate #-}
   {-# INLINE componentMembers #-}
 
