@@ -13,10 +13,12 @@ import Hero.Component
   ( Component,
     ComponentId,
     Store',
+    Store,
     Stores,
     getComponentId,
     getStore,
     newStores,
+    ComponentMakeStore
   )
 import Hero.Entity
   ( Entities,
@@ -25,11 +27,12 @@ import Hero.Entity
     newEntities,
     newEntity,
   )
+import Data.Kind (Type)
 
 data World = World
-  { worldStores :: {-# UNPACK #-} !Stores,
-    worldEntities :: {-# UNPACK #-} !Entities,
-    worldMaxEntities :: {-# UNPACK #-} !MaxEntities
+  { worldStores :: !Stores,
+    worldEntities :: !Entities,
+    worldMaxEntities :: !MaxEntities
   }
 
 -- | Create a new world which can hold as many entities as were specified in the input parameter.
@@ -41,11 +44,11 @@ newWorld !max = do
   !entities <- newEntities maxEnts
   pure $ World stores entities maxEnts
 
-worldComponentId :: forall component. Component component => Component component => World -> IO ComponentId
+worldComponentId :: forall (component :: Type). Component component => World -> IO ComponentId
 worldComponentId !w = getComponentId @component (worldStores w) (worldMaxEntities w)
 {-# INLINE worldComponentId #-}
 
-worldComponent :: forall component. Component component => Component component => World -> IO (Store' component)
+worldComponent :: forall component. Component component => World -> IO (Store' component)
 worldComponent !w = getComponentId @component (worldStores w) (worldMaxEntities w) >>= getStore (worldStores w)
 {-# INLINE worldComponent #-}
 

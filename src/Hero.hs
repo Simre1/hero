@@ -7,10 +7,15 @@ module Hero
     Entity,
 
     -- * Component
-    Component(..),
+    Component (..),
     StorableSparseSet,
+    storableSparseSet,
     UnboxedSparseSet,
+    unboxedSparseSet,
     BoxedSparseSet,
+    boxedSparseSet,
+    Global,
+    makeGlobal,
 
     -- * System
     System,
@@ -23,7 +28,6 @@ module Hero
     cfoldr,
     newEntity,
     liftSystem,
-    
 
     -- * Query
     Query,
@@ -38,14 +42,16 @@ module Hero
     QCP,
     QCD,
     QCI,
+
     -- * Re-Exports
-    Arrow(..)
+    Arrow (..),
   )
 where
 
+import Control.Arrow
 import Hero.Component
+import Hero.Component.Global
 import Hero.Component.SparseSet
 import Hero.Entity hiding (newEntity)
 import Hero.System
 import Hero.World
-import Control.Arrow

@@ -1,4 +1,4 @@
-module Hero.Entity (Entity(..), MaxEntities(..), Entities, newEntities, newEntity, removeEntity, forEntities, entityAmount) where
+module Hero.Entity (Entity(..), MaxEntities(..), global, Entities, newEntities, newEntity, removeEntity, forEntities, entityAmount) where
 
 import Data.Coerce (coerce)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
@@ -16,7 +16,7 @@ newtype Entity = Entity Word32
 newtype MaxEntities = MaxEntities Word32
 
 -- | The data structure storing all entities.
-data Entities = Entities {-# UNPACK #-} !S.SparseSetNoComponent {-# UNPACK #-} !(IORef Word32)
+data Entities = Entities !S.SparseSetNoComponent !(IORef Word32)
 
 newEntities :: MaxEntities -> IO Entities
 newEntities (MaxEntities max) = do
@@ -51,3 +51,8 @@ forEntities (Entities entities _) f = S.for entities (coerce f)
 entityAmount :: Entities -> IO Int
 entityAmount (Entities entities _) = S.size entities
 {-# INLINE entityAmount #-}
+
+-- | 'global' is an entity which is not part of normal component store but can
+-- be used to access global components like the 'Global' store.
+global :: Entity
+global = Entity maxBound

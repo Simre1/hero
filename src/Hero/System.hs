@@ -337,22 +337,22 @@ instance QueryIterate False Entity where
   {-# INLINE queryMembers #-}
 
 instance (Component a, ComponentGet a (Store a)) => QueryGet True a where
-  queryContains w = worldComponent @a w <&> \s !e -> storeContains s e
-  queryGet w = worldComponent @a w <&> \s !e -> storeGet s e
+  queryContains w = worldComponent @a w <&> \s !e -> componentContains s e
+  queryGet w = worldComponent @a w <&> \s !e -> componentGet s e
   {-# INLINE queryContains #-}
   {-# INLINE queryGet #-}
 
 instance (Component a, ComponentPut a (Store a)) => QueryPut True a where
-  queryPut w = worldComponent w <&> \s !e c -> storePut s e c
+  queryPut w = worldComponent w <&> \s !e c -> componentPut s e c
   {-# INLINE queryPut #-}
 
 instance (Component a, ComponentDelete a (Store a)) => QueryDelete True a where
-  queryDelete w = worldComponent @a w <&> \s !e -> storeDelete s e
+  queryDelete w = worldComponent @a w <&> \s !e -> componentDelete s e
   {-# INLINE queryDelete #-}
 
 instance (Component a, ComponentIterate a (Store a)) => QueryIterate True a where
-  queryFor w = worldComponent @a w <&> \s f -> storeFor s f
-  queryMembers w = worldComponent @a w <&> storeMembers
+  queryFor w = worldComponent @a w <&> \s f -> componentIterate (worldEntities w) s f
+  queryMembers w = worldComponent @a w <&> componentMembers (worldEntities w)
   {-# INLINE queryFor #-}
   {-# INLINE queryMembers #-}
 

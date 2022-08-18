@@ -1,28 +1,34 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Hero.Component (
-  -- * Component
-  -- To make a component of a datatype, you have to decide on the underlying datastructure. 
-  -- Most likely, SparseSetStorableStore or SparseSetBoxedStore are the way to go.
-  Component(..),
-  -- * Store
-  -- Store have different capabilities and not every store implements every operation.
-  -- For example, you cannot set or delete the Entity component.
-  ComponentId,
-  ComponentMakeStore(..),
-  ComponentGet(..),
-  ComponentPut(..),
-  ComponentDelete(..),
-  ComponentIterate(..),
-  Store',
-  Stores,
-  newStores,
-  getComponentId,
-  getStore
-) where
+module Hero.Component
+  ( -- * Component
 
+    -- To make a component of a datatype, you have to decide on the underlying datastructure.
+    -- Most likely, SparseSetStorableStore or SparseSetBoxedStore are the way to go.
+    Component (..),
+
+    -- * Store
+
+    -- Store have different capabilities and not every store implements every operation.
+    -- For example, you cannot set or delete the Entity component.
+    ComponentId,
+    ComponentMakeStore (..),
+    ComponentGet (..),
+    ComponentPut (..),
+    ComponentDelete (..),
+    ComponentIterate (..),
+    Store',
+    Stores,
+    newStores,
+    getComponentId,
+    getStore,
+  )
+where
+
+import Control.Monad.IO.Class (MonadIO)
 import Data.IORef
   ( IORef,
     modifyIORef,
@@ -37,10 +43,9 @@ import Data.Proxy (Proxy (Proxy))
 import Data.Vector.Mutable qualified as V
 import Data.Vector.Storable (Storable)
 import Data.Word (Word32)
-import Hero.Entity (Entity, MaxEntities (MaxEntities))
+import Hero.Entity (Entities, Entity, MaxEntities (MaxEntities))
 import Type.Reflection (SomeTypeRep, Typeable, someTypeRep)
 import Unsafe.Coerce (unsafeCoerce)
-import Control.Monad.IO.Class ( MonadIO )
 
 -- | 'ComponentId' is unique to a component within the context of a World. Do not
 -- use the same 'ComponentId' with different worlds.
@@ -48,29 +53,32 @@ newtype ComponentId = ComponentId {unwrapComponentId :: Int} deriving (Show, Eq)
 
 -- | A component is a Haskell datatype usually containing raw data.
 -- For example `data Position = Position Float Float`
-class (ComponentMakeStore component (Store component), Typeable component) => Component component where
+class Typeable component => Component component where
   type Store component :: Type -> Type
-  componentMakeStore :: Maybe (MaxEntities -> IO (store component))
-  componentMakeStore = Nothing
+  makeStore :: MaxEntities -> IO (Store' component)
+  default makeStore :: ComponentMakeStore component (Store component) => MaxEntities -> IO (Store' component)
+  makeStore = componentMakeStore
 
 type Store' component = Store component component
 
+-- | The default implementation for 'makeStore'. It can be overriden by providing a
+-- 'makeStore' method for a component.
 class ComponentMakeStore component store where
-  makeStore :: MaxEntities -> IO (store component)
+  componentMakeStore :: MaxEntities -> IO (store component)
 
 class ComponentGet component store where
-  storeContains :: store component -> Entity -> IO Bool
-  storeGet :: store component -> Entity -> IO component
+  componentContains :: store component -> Entity -> IO Bool
+  componentGet :: store component -> Entity -> IO component
 
 class ComponentPut component store where
-  storePut :: store component -> Entity -> component -> IO ()
+  componentPut :: store component -> Entity -> component -> IO ()
 
 class ComponentDelete component store where
-  storeDelete :: store component -> Entity -> IO ()
+  componentDelete :: store component -> Entity -> IO ()
 
 class ComponentGet component store => ComponentIterate component store where
-  storeFor :: MonadIO m => store component -> (Entity -> component -> m ()) -> m ()
-  storeMembers :: store component -> IO Int
+  componentIterate :: MonadIO m => Entities -> store component -> (Entity -> component -> m ()) -> m ()
+  componentMembers :: Entities -> store component -> IO Int
 
 newtype WrappedStorage = WrappedStorage (forall component. Store' component)
 
@@ -100,9 +108,9 @@ addStore (Stores storeVecRef mappingsRef) store = do
       pure $ ComponentId newId
     Just i -> V.unsafeWrite storeVec (unwrapComponentId i) wrappedStore *> pure i
 
-addComponentStore :: forall component. (Component component) => Stores -> MaxEntities -> IO ComponentId
+addComponentStore :: forall (component :: Type). Component component => Stores -> MaxEntities -> IO ComponentId
 addComponentStore stores@(Stores storeVec mappings) max = do
-  store <- fromMaybe makeStore (componentMakeStore @component) $ max 
+  store <- makeStore @component max
   addStore @component stores store
 
 -- | Gets the store associated within a component id. Remember that component ids must be used with the world
@@ -111,8 +119,8 @@ getStore :: forall component. Stores -> ComponentId -> IO (Store' component)
 getStore (Stores storeVecRef _) componentId =
   readIORef storeVecRef >>= \vec -> unwrapWrappedStorage @component <$> V.unsafeRead vec (unwrapComponentId componentId)
 
--- | Gets the component id for a component. It sets up the component store if it does not exist yet within the given world. 
-getComponentId :: forall component. (ComponentMakeStore component (Store component), Component component) => Stores -> MaxEntities -> IO ComponentId
+-- | Gets the component id for a component. It sets up the component store if it does not exist yet within the given world.
+getComponentId :: forall (component :: Type). Component component => Stores -> MaxEntities -> IO ComponentId
 getComponentId stores@(Stores _ mappingsRef) max = do
   maybeComponent <- M.lookup (someTypeRep $ Proxy @component) <$> readIORef mappingsRef
   case maybeComponent of

@@ -1,8 +1,5 @@
-{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE UnliftedNewtypes #-}
 {-# OPTIONS_GHC -fplugin=Foreign.Storable.Generic.Plugin #-}
 
 import Control.Monad ( forM_ )
@@ -10,14 +7,14 @@ import qualified Hero.SparseSet.Storable as SV
 import Foreign.Storable.Generic (GStorable)
 import GHC.Generics (Generic)
 import Hero
-    ( Component(Store),
+    ( Component(Store, makeStore),
       StorableSparseSet,
       World,
       newWorld,
       System,
       compileSystem,
       cmap,
-      newEntity )
+      newEntity, Global )
 import Test.Tasty.Bench ( bench, defaultMain, whnfIO )
 
 data Position = Position {-# UNPACK #-} !Int {-# UNPACK #-} !Int deriving (Generic)

@@ -22,10 +22,10 @@ instance GStorable Position
 data Velocity = Velocity {-# UNPACK #-} !Int deriving (Generic)
 
 instance Component Position where
-  type Store Position = SparseSetStorableStore
+  type Store Position = StorableSparseSet
 
 instance Component Velocity where
-  type Store Velocity = SparseSetStorableStore
+  type Store Velocity = StorableSparseSet
 
 instance GStorable Velocity
 
