@@ -77,6 +77,17 @@ system =
   cmapM (\(Position x y) -> print (x,y))
 ```
 
+## Installation with Cabal
+
+To use _Hero_ as a dependency, add `hero` to the `build-depends` section. Additional, create a `cabal.project` with: 
+```
+packages: *.cabal
+
+source-repository-package
+   type: git
+   location: https://github.com/Simre1/hero
+```
+
 ## Benchmark
 
 A basic benchmark seems to suggest that `Hero` is much faster. However, it relies heavily on
@@ -87,17 +98,6 @@ The following queries are used to test the iteration speed of both libraries:
 ```
 cmap (\(Velocity vx vy, Acceleration ax ay) -> Velocity (vx + ax) (vy + ay)) *>
 cmap (\(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy))
-```
-
-## Installation with Cabal
-
-To use _Hero_ as a dependency, add `hero` to the `build-depends` section. Additional, create a `cabal.project` with: 
-```
-packages: *.cabal
-
-source-repository-package
-   type: git
-   location: https://github.com/Simre1/hero
 ```
 
 ### Hero
