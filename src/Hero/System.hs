@@ -36,7 +36,7 @@ import Hero.Component
     ComponentStore (..),
     eachStore,
   )
-import Hero.Entity (Entity, entitiesAmount, entitiesFor, entitiesDelete)
+import Hero.Entity (Entity, entitiesAmount, entitiesDelete, entitiesFor)
 import Hero.World
   ( World (worldEntities, worldStores),
     worldComponent,
@@ -211,16 +211,16 @@ runQuery_ (Query makeQ) = System $ \w -> do
 
 -- | Execute a query on the given entity. If the entity does not have the
 -- requested components, nothing is done.
-singleQuery_ :: forall i o m. (QCG i, MonadIO m) => Query m i o -> World -> IO (Entity -> m ())
-singleQuery_ (Query makeQ) w = do
+singleQuery_ :: forall i o m. (QCG i, MonadIO m) => Query m i o -> System m Entity (Maybe o)
+singleQuery_ (Query makeQ) = System $ \w -> do
   q <- makeQ w
   getValues <- queryGet @(S i) @i w
   contains <- queryContains @(S i) @i w
   pure $ \e -> do
-    whenIO (liftIO $ contains e) $ do
-      values <- liftIO $ getValues e
-      q e values
-      pure ()
+    c <- liftIO $ contains e
+    if c
+      then fmap Just $ liftIO (getValues e) >>= q e
+      else pure Nothing
 {-# INLINE singleQuery_ #-}
 
 -- | Execute a query on the given entity. If the entity does not have the
@@ -229,13 +229,12 @@ singleQuery ::
   forall i1 i2 o m.
   (QCG i1, MonadIO m) =>
   Query m (i1, i2) o ->
-  World ->
-  IO (Entity -> i2 -> m (Maybe o))
-singleQuery (Query makeQ) w = do
+  System m (Entity, i2) (Maybe o)
+singleQuery (Query makeQ) = System $ \w -> do
   q <- makeQ w
   getValues <- queryGet @(S i1) @i1 w
   contains <- queryContains @(S i1) @i1 w
-  pure $ \e i2 -> do
+  pure $ \(e, i2) -> do
     c <- (liftIO $ contains e)
     if c
       then do
@@ -266,14 +265,14 @@ instance Monad m => Arrow (Query m) where
   {-# INLINE arr #-}
   {-# INLINE (***) #-}
 
--- Set a component of the matching entity
+-- | Set a component of the matching entity
 qput :: forall i m. (QCP i, MonadIO m) => Query m i ()
 qput = Query $ \w -> do
   put <- queryPut @(S i) @i w
   pure (fmap liftIO . put)
 {-# INLINE qput #-}
 
--- Delete the component of the matching entity
+-- | Delete the component of the matching entity
 qdelete :: forall i m. (QCD i, MonadIO m) => Query m i ()
 qdelete = Query $ \w -> do
   delete <- queryDelete @(S i) @i w
