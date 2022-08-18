@@ -2,7 +2,26 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Hero.Component where
+module Hero.Component (
+  -- * Component
+  -- To make a component of a datatype, you have to decide on the underlying datastructure. 
+  -- Most likely, SparseSetStorableStore or SparseSetBoxedStore are the way to go.
+  Component(..),
+  -- * Store
+  -- Store have different capabilities and not every store implements every operation.
+  -- For example, you cannot set or delete the Entity component.
+  ComponentId,
+  ComponentMakeStore(..),
+  ComponentGet(..),
+  ComponentPut(..),
+  ComponentDelete(..),
+  ComponentIterate(..),
+  Store',
+  Stores,
+  newStores,
+  getComponentId,
+  getStore
+) where
 
 import Data.IORef
   ( IORef,
@@ -21,24 +40,23 @@ import Data.Word (Word32)
 import Hero.Entity (Entity, MaxEntities (MaxEntities))
 import Type.Reflection (SomeTypeRep, Typeable, someTypeRep)
 import Unsafe.Coerce (unsafeCoerce)
-import Control.Monad.IO.Class
+import Control.Monad.IO.Class ( MonadIO )
 
--- | ComponentId is unique to a component within the context of a World.
-newtype ComponentId = ComponentId {unwrapComponentId :: Int} deriving (Show)
+-- | 'ComponentId' is unique to a component within the context of a World. Do not
+-- use the same 'ComponentId' with different worlds.
+newtype ComponentId = ComponentId {unwrapComponentId :: Int} deriving (Show, Eq)
 
 -- | A component is a Haskell datatype usually containing raw data.
 -- For example `data Position = Position Float Float`
 class (ComponentMakeStore component (Store component), Typeable component) => Component component where
   type Store component :: Type -> Type
-  liveEntities :: Maybe Word32
-  liveEntities = Nothing
+  componentMakeStore :: Maybe (MaxEntities -> IO (store component))
+  componentMakeStore = Nothing
 
 type Store' component = Store component component
 
-data MakeStore = MakeStore {maxGlobalEntities :: Word32, maxComponentEntities :: Word32}
-
 class ComponentMakeStore component store where
-  makeStore :: MakeStore -> IO (store component)
+  makeStore :: MaxEntities -> IO (store component)
 
 class ComponentGet component store where
   storeContains :: store component -> Entity -> IO Bool
@@ -83,23 +101,26 @@ addStore (Stores storeVecRef mappingsRef) store = do
     Just i -> V.unsafeWrite storeVec (unwrapComponentId i) wrappedStore *> pure i
 
 addComponentStore :: forall component. (Component component) => Stores -> MaxEntities -> IO ComponentId
-addComponentStore stores@(Stores storeVec mappings) (MaxEntities max) = do
-  store <- makeStore @component $ MakeStore max (fromMaybe max (liveEntities @component))
+addComponentStore stores@(Stores storeVec mappings) max = do
+  store <- fromMaybe makeStore (componentMakeStore @component) $ max 
   addStore @component stores store
 
+-- | Gets the store associated within a component id. Remember that component ids must be used with the world
+-- they were created with.
 getStore :: forall component. Stores -> ComponentId -> IO (Store' component)
 getStore (Stores storeVecRef _) componentId =
   readIORef storeVecRef >>= \vec -> unwrapWrappedStorage @component <$> V.unsafeRead vec (unwrapComponentId componentId)
 
+-- | Gets the component id for a component. It sets up the component store if it does not exist yet within the given world. 
 getComponentId :: forall component. (ComponentMakeStore component (Store component), Component component) => Stores -> MaxEntities -> IO ComponentId
-getComponentId stores@(Stores _ mappingsRef) (MaxEntities max) = do
+getComponentId stores@(Stores _ mappingsRef) max = do
   maybeComponent <- M.lookup (someTypeRep $ Proxy @component) <$> readIORef mappingsRef
   case maybeComponent of
     Just componentId -> pure componentId
     Nothing -> do
-      store <- makeStore @component $ MakeStore max (fromMaybe max (liveEntities @component))
-      componentId <- addStore @component stores store
+      componentId <- addComponentStore @component stores max
       pure componentId
 
+-- | 'Stores' holds all component stores.
 newStores :: IO Stores
 newStores = Stores <$> (V.new 10 >>= newIORef) <*> newIORef M.empty

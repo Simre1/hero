@@ -1,4 +1,4 @@
-module Hero.Entity where
+module Hero.Entity (Entity(..), MaxEntities(..), Entities, newEntities, newEntity, removeEntity, forEntities, entityAmount) where
 
 import Data.Coerce (coerce)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
@@ -7,11 +7,16 @@ import Data.Vector.Unboxed.Mutable qualified as VU
 import Data.Word (Word32)
 import Control.Monad.IO.Class (MonadIO)
 
+-- An entity is an object within a world with components. 'Entity' can be used to access the components of a world.
+-- Working the the underlying 'World32' is probably not a good idea.
 newtype Entity = Entity Word32
 
+-- | MaxEntities should be the maximum amount of live entities within a world. Lower max entity count
+-- saves memory.
 newtype MaxEntities = MaxEntities Word32
 
-data Entities = Entities !S.SparseSetNoComponent !(IORef Word32)
+-- | The data structure storing all entities.
+data Entities = Entities {-# UNPACK #-} !S.SparseSetNoComponent {-# UNPACK #-} !(IORef Word32)
 
 newEntities :: MaxEntities -> IO Entities
 newEntities (MaxEntities max) = do

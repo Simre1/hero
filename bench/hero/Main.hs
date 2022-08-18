@@ -11,7 +11,7 @@ import Foreign.Storable.Generic (GStorable)
 import GHC.Generics (Generic)
 import Hero
     ( Component(Store),
-      SparseSetStorableStore,
+      StorableSparseSet,
       World,
       newWorld,
       System,
@@ -19,7 +19,6 @@ import Hero
       cmap,
       newEntity )
 import Test.Tasty.Bench ( bench, defaultMain, whnfIO )
-import Hero.Component.SparseSet (SparseSetBoxedStore)
 
 data Position = Position {-# UNPACK #-} !Int {-# UNPACK #-} !Int deriving (Generic)
 
@@ -34,13 +33,13 @@ data Acceleration = Acceleration {-# UNPACK #-} !Int {-# UNPACK #-} !Int derivin
 instance GStorable Acceleration
 
 instance Component Position where
-  type Store Position = SparseSetStorableStore
+  type Store Position = StorableSparseSet
 
 instance Component Velocity where
-  type Store Velocity = SparseSetStorableStore
+  type Store Velocity = StorableSparseSet
 
 instance Component Acceleration where
-  type Store Acceleration = SparseSetStorableStore
+  type Store Acceleration = StorableSparseSet
 
 main :: IO ()
 main = do

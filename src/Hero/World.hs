@@ -1,6 +1,12 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 
-module Hero.World where
+module Hero.World (
+  World(..),
+  newWorld,
+  worldComponentId,
+  worldComponent,
+  worldNewEntity
+) where
 
 import Data.Word (Word32)
 import Hero.Component

@@ -1,8 +1,16 @@
-module Hero.Component.SparseSet where
+module Hero.Component.SparseSet (
+  StorableSparseSet,
+  storableSparseSet,
+  UnboxedSparseSet,
+  unboxedSparseSet,
+  BoxedSparseSet,
+  boxedSparseSet
+) where
 
 import Data.Coerce (coerce)
 import Data.Vector.Storable (Storable)
 import Data.Vector.Unboxed (Unbox)
+import Data.Word (Word32)
 import Hero.Component
   ( Component,
     ComponentDelete (..),
@@ -10,7 +18,6 @@ import Hero.Component
     ComponentIterate (..),
     ComponentMakeStore (..),
     ComponentPut (..),
-    MakeStore (MakeStore),
   )
 import Hero.Entity
   ( Entity (Entity),
@@ -20,81 +27,97 @@ import Hero.SparseSet.Boxed qualified as SB
 import Hero.SparseSet.Storable qualified as SV
 import Hero.SparseSet.Unboxed qualified as SU
 
--- | Component store backed by an unboxed sparse set
-newtype SparseSetUnboxedStore a = SparseSetUnboxedStore (SU.SparseSetUnboxed a)
+-- | Component store backed by an unboxed sparse set. Can be used as a 'Store'.
+newtype UnboxedSparseSet a = UnboxedSparseSet (SU.SparseSetUnboxed a)
 
-instance (Unbox a) => ComponentGet a SparseSetUnboxedStore where
-  storeContains (SparseSetUnboxedStore set) entity = SU.contains set (coerce entity)
-  storeGet (SparseSetUnboxedStore set) entity = SU.unsafeLookup set (coerce entity)
+-- | Creates an unboxed sparse set. The first parameter should be the maximum amount of live entities (size of the sparse
+-- array) and the second should be the maximum amount of live entities for the component (size of the dense array).
+unboxedSparseSet :: Unbox a => Word32 -> Word32 -> IO (UnboxedSparseSet a)
+unboxedSparseSet global component = UnboxedSparseSet <$> SU.create global component
+
+instance (Unbox a) => ComponentGet a UnboxedSparseSet where
+  storeContains (UnboxedSparseSet set) entity = SU.contains set (coerce entity)
+  storeGet (UnboxedSparseSet set) entity = SU.unsafeLookup set (coerce entity)
   {-# INLINE storeContains #-}
   {-# INLINE storeGet #-}
 
-instance (Unbox a) => ComponentPut a SparseSetUnboxedStore where
-  storePut (SparseSetUnboxedStore set) entity val = SU.insert set (coerce entity) val
+instance (Unbox a) => ComponentPut a UnboxedSparseSet where
+  storePut (UnboxedSparseSet set) entity val = SU.insert set (coerce entity) val
   {-# INLINE storePut #-}
 
-instance (Unbox a) => ComponentDelete a SparseSetUnboxedStore where
-  storeDelete (SparseSetUnboxedStore set) entity = SU.remove set (coerce entity)
+instance (Unbox a) => ComponentDelete a UnboxedSparseSet where
+  storeDelete (UnboxedSparseSet set) entity = SU.remove set (coerce entity)
   {-# INLINE storeDelete #-}
 
-instance (Unbox a) => ComponentIterate a SparseSetUnboxedStore where
-  storeFor (SparseSetUnboxedStore set) f = SU.for set (coerce f)
-  storeMembers (SparseSetUnboxedStore set) = SU.size set
+instance (Unbox a) => ComponentIterate a UnboxedSparseSet where
+  storeFor (UnboxedSparseSet set) f = SU.for set (coerce f)
+  storeMembers (UnboxedSparseSet set) = SU.size set
   {-# INLINE storeFor #-}
   {-# INLINE storeMembers #-}
 
-instance (Unbox a) => ComponentMakeStore a SparseSetUnboxedStore where
-  makeStore (MakeStore global component) = SparseSetUnboxedStore <$> SU.create global component
 
--- | Component store backed by a storable sparse set
-newtype SparseSetStorableStore a = SparseSetStorableStore (SV.SparseSetStorable a)
+instance (Unbox a) => ComponentMakeStore a UnboxedSparseSet where
+  makeStore (MaxEntities global) = unboxedSparseSet global global
 
-instance (Storable a) => ComponentGet a SparseSetStorableStore where
-  storeContains (SparseSetStorableStore set) entity = SV.contains set (coerce entity)
-  storeGet (SparseSetStorableStore set) entity = SV.unsafeLookup set (coerce entity)
+-- | Component store backed by a storable sparse set. Can be used as a 'Store'.
+newtype StorableSparseSet a = StorableSparseSet (SV.SparseSetStorable a)
+
+instance (Storable a) => ComponentGet a StorableSparseSet where
+  storeContains (StorableSparseSet set) entity = SV.contains set (coerce entity)
+  storeGet (StorableSparseSet set) entity = SV.unsafeLookup set (coerce entity)
   {-# INLINE storeContains #-}
   {-# INLINE storeGet #-}
 
-instance (Storable a) => ComponentPut a SparseSetStorableStore where
-  storePut (SparseSetStorableStore set) entity val = SV.insert set (coerce entity) val
+instance (Storable a) => ComponentPut a StorableSparseSet where
+  storePut (StorableSparseSet set) entity val = SV.insert set (coerce entity) val
   {-# INLINE storePut #-}
 
-instance (Storable a) => ComponentDelete a SparseSetStorableStore where
-  storeDelete (SparseSetStorableStore set) entity = SV.remove set (coerce entity)
+instance (Storable a) => ComponentDelete a StorableSparseSet where
+  storeDelete (StorableSparseSet set) entity = SV.remove set (coerce entity)
   {-# INLINE storeDelete #-}
 
-instance (Storable a) => ComponentIterate a SparseSetStorableStore where
-  storeFor (SparseSetStorableStore set) f = SV.for set (coerce f)
-  storeMembers (SparseSetStorableStore set) = SV.size set
+instance (Storable a) => ComponentIterate a StorableSparseSet where
+  storeFor (StorableSparseSet set) f = SV.for set (coerce f)
+  storeMembers (StorableSparseSet set) = SV.size set
   {-# INLINE storeFor #-}
   {-# INLINE storeMembers #-}
 
-instance (Storable a) => ComponentMakeStore a SparseSetStorableStore where
-  makeStore (MakeStore global component) = SparseSetStorableStore <$> SV.create global component
+-- | Creates a storable sparse set. The first parameter should be the maximum amount of live entities (size of the sparse
+-- array) and the second should be the maximum amount of live entities for the component (size of the dense array).
+storableSparseSet :: Storable a => Word32 -> Word32 -> IO (StorableSparseSet a)
+storableSparseSet global component = StorableSparseSet <$> SV.create global component
 
--- | Component store backed by a boxed sparse set. The storable version is faster and should be
+instance (Storable a) => ComponentMakeStore a StorableSparseSet where
+  makeStore (MaxEntities global) = storableSparseSet global global
+
+-- | Component store backed by a boxed sparse set. Can be used as a 'Store'. The storable version is faster and should be
 -- used when possible.
-newtype SparseSetBoxedStore a = SparseSetBoxedStore (SB.SparseSetBoxed a)
+newtype BoxedSparseSet a = BoxedSparseSet (SB.SparseSetBoxed a)
 
-instance (Storable a) => ComponentGet a SparseSetBoxedStore where
-  storeContains (SparseSetBoxedStore set) entity = SB.contains set (coerce entity)
-  storeGet (SparseSetBoxedStore set) entity = SB.unsafeLookup set (coerce entity)
+instance (Storable a) => ComponentGet a BoxedSparseSet where
+  storeContains (BoxedSparseSet set) entity = SB.contains set (coerce entity)
+  storeGet (BoxedSparseSet set) entity = SB.unsafeLookup set (coerce entity)
   {-# INLINE storeContains #-}
   {-# INLINE storeGet #-}
 
-instance (Storable a) => ComponentPut a SparseSetBoxedStore where
-  storePut (SparseSetBoxedStore set) entity val = SB.insert set (coerce entity) val
+instance (Storable a) => ComponentPut a BoxedSparseSet where
+  storePut (BoxedSparseSet set) entity val = SB.insert set (coerce entity) val
   {-# INLINE storePut #-}
 
-instance (Storable a) => ComponentDelete a SparseSetBoxedStore where
-  storeDelete (SparseSetBoxedStore set) entity = SB.remove set (coerce entity)
+instance (Storable a) => ComponentDelete a BoxedSparseSet where
+  storeDelete (BoxedSparseSet set) entity = SB.remove set (coerce entity)
   {-# INLINE storeDelete #-}
 
-instance (Storable a) => ComponentIterate a SparseSetBoxedStore where
-  storeFor (SparseSetBoxedStore set) f = SB.for set (coerce f)
-  storeMembers (SparseSetBoxedStore set) = SB.size set
+instance (Storable a) => ComponentIterate a BoxedSparseSet where
+  storeFor (BoxedSparseSet set) f = SB.for set (coerce f)
+  storeMembers (BoxedSparseSet set) = SB.size set
   {-# INLINE storeFor #-}
   {-# INLINE storeMembers #-}
 
-instance (Storable a) => ComponentMakeStore a SparseSetBoxedStore where
-  makeStore (MakeStore global component) = SparseSetBoxedStore <$> SB.create global component
+-- | Creates a boxed sparse set. The first parameter should be the maximum amount of live entities (size of the sparse
+-- array) and the second should be the maximum amount of live entities for the component (size of the dense array).
+boxedSparseSet :: Storable a => Word32 -> Word32 -> IO (BoxedSparseSet a)
+boxedSparseSet global component = BoxedSparseSet <$> SB.create global component
+
+instance (Storable a) => ComponentMakeStore a BoxedSparseSet where
+  makeStore (MaxEntities global) = boxedSparseSet global global

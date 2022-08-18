@@ -33,7 +33,6 @@ import Hero.Component
     ComponentGet (..),
     ComponentIterate (..),
     ComponentPut (..),
-    addStore,
   )
 import Hero.Entity (Entity, entityAmount, forEntities)
 import Hero.World

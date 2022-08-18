@@ -28,13 +28,13 @@ data Acceleration = Acceleration {-# UNPACK #-} !Int {-# UNPACK #-} !Int derivin
 instance GStorable Acceleration
 
 instance Component Position where
-  type Store Position = SparseSetStorableStore
+  type Store Position = StorableSparseSet
 
 instance Component Velocity where
-  type Store Velocity = SparseSetStorableStore
+  type Store Velocity = StorableSparseSet
 
 instance Component Acceleration where
-  type Store Acceleration = SparseSetStorableStore
+  type Store Acceleration = StorableSparseSet
 
 main :: IO ()
 main = do

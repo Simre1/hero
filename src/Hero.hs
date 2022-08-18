@@ -8,8 +8,9 @@ module Hero
 
     -- * Component
     Component(..),
-    SparseSetStorableStore,
-    SparseSetUnboxedStore,
+    StorableSparseSet,
+    UnboxedSparseSet,
+    BoxedSparseSet,
 
     -- * System
     System,
