@@ -60,6 +60,14 @@ executable hero-bench
     default-language: GHC2021
     ghc-options: -O2
 
+executable example
+    main-is: Main.hs
+    build-depends:    base >4.13.0.0, hero
+    hs-source-dirs:   example
+    default-language: GHC2021
+    ghc-options: -O2
+
+
 executable apecs-bench
     main-is: Main.hs
     build-depends:    base >4.13.0.0, tasty, tasty-bench, apecs

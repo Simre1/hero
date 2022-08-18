@@ -53,6 +53,7 @@ module Hero
 
     -- * Re-Exports
     Arrow (..),
+    (>>>)
   )
 where
 

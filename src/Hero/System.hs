@@ -287,16 +287,20 @@ type family S a where
   S (a, b, c) = False
   S _ = True
 
+-- | Gets components from the world
 class QueryGet (f :: Bool) components where
   queryContains :: World -> IO (Entity -> IO Bool)
   queryGet :: World -> IO (Entity -> IO components)
 
+-- | Puts components into the world
 class QueryPut (f :: Bool) components where
   queryPut :: World -> IO (Entity -> components -> IO ())
 
+-- | Removes components from the world
 class QueryDelete (f :: Bool) components where
   queryDelete :: World -> IO (Entity -> IO ())
 
+-- | Iterate over components from the world
 class QueryGet f components => QueryIterate (f :: Bool) components where
   queryFor :: MonadIO m => World -> IO ((Entity -> components -> m ()) -> m ())
   queryMembers :: World -> IO (IO Int)

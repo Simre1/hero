@@ -105,21 +105,21 @@ instance ComponentStore a BoxedSparseSet where
   componentEntityDelete (BoxedSparseSet set) entity = SB.remove set (coerce entity)
 
 
-instance (Storable a) => ComponentGet a BoxedSparseSet where
+instance ComponentGet a BoxedSparseSet where
   componentContains (BoxedSparseSet set) entity = SB.contains set (coerce entity)
   componentGet (BoxedSparseSet set) entity = SB.unsafeLookup set (coerce entity)
   {-# INLINE componentContains #-}
   {-# INLINE componentGet #-}
 
-instance (Storable a) => ComponentPut a BoxedSparseSet where
+instance ComponentPut a BoxedSparseSet where
   componentPut (BoxedSparseSet set) entity val = SB.insert set (coerce entity) val
   {-# INLINE componentPut #-}
 
-instance (Storable a) => ComponentDelete a BoxedSparseSet where
+instance ComponentDelete a BoxedSparseSet where
   componentDelete (BoxedSparseSet set) entity = SB.remove set (coerce entity)
   {-# INLINE componentDelete #-}
 
-instance (Storable a) => ComponentIterate a BoxedSparseSet where
+instance ComponentIterate a BoxedSparseSet where
   componentIterate (BoxedSparseSet set) f = SB.for set (coerce f)
   componentMembers (BoxedSparseSet set) = SB.size set
   {-# INLINE componentIterate #-}
@@ -127,8 +127,8 @@ instance (Storable a) => ComponentIterate a BoxedSparseSet where
 
 -- | Creates a boxed sparse set. The first parameter should be the maximum amount of live entities (size of the sparse
 -- array) and the second should be the maximum amount of live entities for the component (size of the dense array).
-boxedSparseSet :: Storable a => Word32 -> Word32 -> IO (BoxedSparseSet a)
+boxedSparseSet :: Word32 -> Word32 -> IO (BoxedSparseSet a)
 boxedSparseSet global component = BoxedSparseSet <$> SB.create global component
 
-instance (Storable a) => ComponentMakeStore a BoxedSparseSet where
+instance ComponentMakeStore a BoxedSparseSet where
   componentMakeStore (MaxEntities global) = boxedSparseSet global global
