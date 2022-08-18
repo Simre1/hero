@@ -1,0 +1,8 @@
+dist-newstyle
+*.sh
+*.prof
+*.prof.html
+*.hp
+*.aux
+*.png
+*.ps
