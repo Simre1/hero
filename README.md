@@ -77,7 +77,34 @@ system =
   cmapM (\(Position x y) -> print (x,y))
 ```
 
-## Installation with Cabal
+## Installation
+
+To download the project and execute it, you need at least _GHC 9_. I have tested it with _GHC 9.2.1_.
+
+Then, you can run the following commands to build the project.
+```
+git clone https://github.com/Simre1/hero
+cd hero
+cabal build all
+```
+
+To run the example, do:
+```
+cabal run example
+```
+
+To run the tests, do:
+```
+cabal test
+```
+
+To run the benchmarks, do:
+```
+cabal run hero-bench
+cabal run apecs-bench
+```
+
+### Cabal dependency
 
 To use _Hero_ as a dependency, add `hero` to the `build-depends` section. Additional, create a `cabal.project` with: 
 ```
