@@ -2,7 +2,7 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Hex.System where
+module Hero.System where
 
 import Control.Arrow (Arrow (arr, (***)))
 import Control.Category (Category (..))
@@ -27,7 +27,7 @@ import Data.Monoid
     Monoid (mempty),
     (<>),
   )
-import Hex.Component
+import Hero.Component
   ( Component (Store),
     ComponentDelete (..),
     ComponentGet (..),
@@ -35,8 +35,8 @@ import Hex.Component
     ComponentPut (..),
     addStore,
   )
-import Hex.Entity (Entity, entityAmount, forEntities)
-import Hex.World
+import Hero.Entity (Entity, entityAmount, forEntities)
+import Hero.World
   ( World (worldEntities, worldStores),
     worldComponent,
     worldNewEntity,
@@ -73,6 +73,7 @@ instance Applicative m => Functor (System m i) where
 
 instance Applicative m => Applicative (System m i) where
   pure a = System $ \_ -> pure $ \_ -> pure a
+  -- | (<*>) might be automatically parallelized in the future. Use (>>>) for sequential code. 
   (System makeSF) <*> (System makeSV) = System $ \w -> do
     f <- makeSF w
     v <- makeSV w

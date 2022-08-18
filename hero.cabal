@@ -1,0 +1,74 @@
+cabal-version:      2.4
+name:               hero
+version:            0.1.0.0
+
+-- A short (one-line) description of the package.
+-- synopsis:
+
+-- A longer description of the package.
+-- description:
+
+-- A URL where users can report bugs.
+-- bug-reports:
+
+-- The license under which the package is released.
+-- license:
+author:             Simre1
+maintainer:         simre4775@gmail.com
+
+-- A copyright notice.
+-- copyright:
+-- category:
+extra-source-files: CHANGELOG.md
+
+library
+    build-depends:    base >4.13.0.0, vector > 0.12, transformers, containers
+    hs-source-dirs:   src
+    exposed-modules:
+        Hero.SparseSet.Unboxed,
+        Hero.SparseSet.Storable,
+        Hero.SparseSet.NoComponent,
+        Hero.SparseSet.Boxed,
+        Hero,
+        Hero.World,
+        Hero.Component,
+        Hero.Entity,
+        Hero.System,
+        Hero.Component.SparseSet
+
+    default-language: GHC2021
+    default-extensions:
+        DataKinds
+        TypeFamilies
+        Strict
+        MagicHash
+    ghc-options: -O2
+
+test-suite hero
+    type: exitcode-stdio-1.0
+    main-is: Main.hs
+    build-depends:    base >4.13.0.0, hero, tasty, tasty-hunit, derive-storable, derive-storable-plugin
+    hs-source-dirs:   test
+    default-language: GHC2021
+
+executable hero-bench
+    main-is: Main.hs
+    build-depends:    base >4.13.0.0, hero, tasty, tasty-bench, transformers, derive-storable, derive-storable-plugin
+    hs-source-dirs:   bench/hero
+    default-language: GHC2021
+    ghc-options: -O2
+
+executable apecs-bench
+    main-is: Main.hs
+    build-depends:    base >4.13.0.0, tasty, tasty-bench, apecs
+    hs-source-dirs:   bench/apecs
+    default-language: GHC2021
+    ghc-options: -O2
+
+executable profile
+    main-is: Main.hs
+    build-depends:    base >4.13.0.0, hero, derive-storable, derive-storable-plugin
+    hs-source-dirs:   profile
+    default-language: GHC2021
+    ghc-options: -O2
+

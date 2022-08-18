@@ -1,8 +1,8 @@
-module Hex.Entity where
+module Hero.Entity where
 
 import Data.Coerce (coerce)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
-import Data.SparseSet.NoComponent qualified as S
+import Hero.SparseSet.NoComponent qualified as S
 import Data.Vector.Unboxed.Mutable qualified as VU
 import Data.Word (Word32)
 import Control.Monad.IO.Class (MonadIO)

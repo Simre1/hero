@@ -1,4 +1,4 @@
-module Hex
+module Hero
   ( -- * World
     World,
     newWorld,
@@ -42,9 +42,9 @@ module Hex
   )
 where
 
-import Hex.Component
-import Hex.Component.SparseSet
-import Hex.Entity hiding (newEntity)
-import Hex.System
-import Hex.World
+import Hero.Component
+import Hero.Component.SparseSet
+import Hero.Entity hiding (newEntity)
+import Hero.System
+import Hero.World
 import Control.Arrow

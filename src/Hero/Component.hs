@@ -2,7 +2,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Hex.Component where
+module Hero.Component where
 
 import Data.IORef
   ( IORef,
@@ -18,7 +18,7 @@ import Data.Proxy (Proxy (Proxy))
 import Data.Vector.Mutable qualified as V
 import Data.Vector.Storable (Storable)
 import Data.Word (Word32)
-import Hex.Entity (Entity, MaxEntities (MaxEntities))
+import Hero.Entity (Entity, MaxEntities (MaxEntities))
 import Type.Reflection (SomeTypeRep, Typeable, someTypeRep)
 import Unsafe.Coerce (unsafeCoerce)
 import Control.Monad.IO.Class

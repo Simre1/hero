@@ -6,10 +6,10 @@
 {-# OPTIONS_GHC -fplugin=Foreign.Storable.Generic.Plugin #-}
 
 import Control.Monad ( forM_ )
-import qualified Data.SparseSet.Storable as SV
+import qualified Hero.SparseSet.Storable as SV
 import Foreign.Storable.Generic (GStorable)
 import GHC.Generics (Generic)
-import Hex
+import Hero
     ( Component(Store),
       SparseSetStorableStore,
       World,
@@ -19,6 +19,7 @@ import Hex
       cmap,
       newEntity )
 import Test.Tasty.Bench ( bench, defaultMain, whnfIO )
+import Hero.Component.SparseSet (SparseSetBoxedStore)
 
 data Position = Position {-# UNPACK #-} !Int {-# UNPACK #-} !Int deriving (Generic)
 

@@ -7,11 +7,11 @@ import Control.Arrow
 import Data.Foldable (for_)
 import Data.Functor ((<&>))
 import Data.Monoid
-import Data.SparseSet.Storable qualified as S
+import Hero.SparseSet.Storable qualified as S
 import Data.Traversable (for)
 import Foreign.Storable.Generic (GStorable)
 import GHC.Generics
-import Hex
+import Hero
 import Test.Tasty
 import Test.Tasty.HUnit (testCase, (@?))
 

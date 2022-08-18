@@ -1,11 +1,9 @@
-module Hex.Component.SparseSet where
+module Hero.Component.SparseSet where
 
 import Data.Coerce (coerce)
-import Data.SparseSet.Storable qualified as SV
-import Data.SparseSet.Unboxed qualified as SU
 import Data.Vector.Storable (Storable)
 import Data.Vector.Unboxed (Unbox)
-import Hex.Component
+import Hero.Component
   ( Component,
     ComponentDelete (..),
     ComponentGet (..),
@@ -14,10 +12,13 @@ import Hex.Component
     ComponentPut (..),
     MakeStore (MakeStore),
   )
-import Hex.Entity
+import Hero.Entity
   ( Entity (Entity),
     MaxEntities (MaxEntities),
   )
+import Hero.SparseSet.Boxed qualified as SB
+import Hero.SparseSet.Storable qualified as SV
+import Hero.SparseSet.Unboxed qualified as SU
 
 -- | Component store backed by an unboxed sparse set
 newtype SparseSetUnboxedStore a = SparseSetUnboxedStore (SU.SparseSetUnboxed a)
@@ -70,3 +71,30 @@ instance (Storable a) => ComponentIterate a SparseSetStorableStore where
 
 instance (Storable a) => ComponentMakeStore a SparseSetStorableStore where
   makeStore (MakeStore global component) = SparseSetStorableStore <$> SV.create global component
+
+-- | Component store backed by a boxed sparse set. The storable version is faster and should be
+-- used when possible.
+newtype SparseSetBoxedStore a = SparseSetBoxedStore (SB.SparseSetBoxed a)
+
+instance (Storable a) => ComponentGet a SparseSetBoxedStore where
+  storeContains (SparseSetBoxedStore set) entity = SB.contains set (coerce entity)
+  storeGet (SparseSetBoxedStore set) entity = SB.unsafeLookup set (coerce entity)
+  {-# INLINE storeContains #-}
+  {-# INLINE storeGet #-}
+
+instance (Storable a) => ComponentPut a SparseSetBoxedStore where
+  storePut (SparseSetBoxedStore set) entity val = SB.insert set (coerce entity) val
+  {-# INLINE storePut #-}
+
+instance (Storable a) => ComponentDelete a SparseSetBoxedStore where
+  storeDelete (SparseSetBoxedStore set) entity = SB.remove set (coerce entity)
+  {-# INLINE storeDelete #-}
+
+instance (Storable a) => ComponentIterate a SparseSetBoxedStore where
+  storeFor (SparseSetBoxedStore set) f = SB.for set (coerce f)
+  storeMembers (SparseSetBoxedStore set) = SB.size set
+  {-# INLINE storeFor #-}
+  {-# INLINE storeMembers #-}
+
+instance (Storable a) => ComponentMakeStore a SparseSetBoxedStore where
+  makeStore (MakeStore global component) = SparseSetBoxedStore <$> SB.create global component

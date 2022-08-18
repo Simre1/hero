@@ -1,4 +1,4 @@
-module Data.SparseSet.NoComponent
+module Hero.SparseSet.NoComponent
   ( SparseSetNoComponent,
     create,
     insert,

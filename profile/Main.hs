@@ -6,11 +6,11 @@ module Main where
 
 import Control.Monad
 import Control.Monad.IO.Class
-import Hex.Component
-import Hex.Component.SparseSet
-import Hex.Entity (Entity (..), MaxEntities (MaxEntities))
-import Hex.System
-import Hex.World
+import Hero.Component
+import Hero.Component.SparseSet
+import Hero.Entity (Entity (..), MaxEntities (MaxEntities))
+import Hero.System
+import Hero.World
 import GHC.Generics (Generic)
 import Foreign.Storable.Generic (GStorable)
 import Control.Arrow

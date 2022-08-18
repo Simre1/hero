@@ -1,4 +1,4 @@
-module Data.SparseSet.Storable
+module Hero.SparseSet.Storable
   ( SparseSetStorable,
     create,
     insert,
@@ -13,14 +13,19 @@ module Data.SparseSet.Storable
   )
 where
 
-import Control.Monad
-import Control.Monad.IO.Class
+import Control.Monad (forM_ )
+import Control.Monad.IO.Class ( MonadIO(..) )
 import Data.IORef
+    ( IORef,
+      atomicModifyIORef,
+      atomicModifyIORef',
+      newIORef,
+      readIORef )
 import Data.Vector.Primitive qualified as VP
 import Data.Vector.Primitive.Mutable qualified as VPM
 import Data.Vector.Storable qualified as V
 import Data.Vector.Storable.Mutable qualified as VM
-import Data.Word
+import Data.Word ( Word32 )
 import Prelude hiding (lookup)
 
 data SparseSetStorable a = SparseSetStorable
