@@ -224,7 +224,7 @@ singleQuery_ (Query makeQ) = System $ \w -> do
 {-# INLINE singleQuery_ #-}
 
 -- | Execute a query on the given entity. If the entity does not have the
--- requested components, Nothing is returned.
+-- requested components, nothing is done.
 singleQuery ::
   forall i1 i2 o m.
   (QCG i1, MonadIO m) =>
