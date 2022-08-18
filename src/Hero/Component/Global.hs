@@ -8,8 +8,8 @@ import Hero.Component
     ComponentIterate (..),
     ComponentMakeStore (..),
     ComponentPut (..),
+    ComponentStore(..)
   )
-import Hero.Entity (entityAmount, forEntities)
 
 -- | Component store using an IORef for a single component instance.
 -- Every entity has the same component. Can be used as a 'Store'.
@@ -21,6 +21,9 @@ newtype Global a = Global (IORef a)
 makeGlobal :: a -> IO (Global a)
 makeGlobal a = Global <$> newIORef a
 
+instance ComponentStore a Global where
+  componentEntityDelete _ _ = pure ()
+  
 instance ComponentGet a Global where
   componentContains (Global ref) entity = pure True
   componentGet (Global ref) entity = readIORef ref

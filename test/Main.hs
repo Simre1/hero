@@ -4,14 +4,14 @@
 module Main where
 
 import Control.Arrow
-import Data.Foldable (for_)
+import Data.Foldable (forM_, for_)
 import Data.Functor ((<&>))
 import Data.Monoid
-import Hero.SparseSet.Storable qualified as S
 import Data.Traversable (for)
 import Foreign.Storable.Generic (GStorable)
 import GHC.Generics
 import Hero
+import Hero.SparseSet.Storable qualified as S
 import Test.Tasty
 import Test.Tasty.HUnit (testCase, (@?))
 
@@ -48,7 +48,21 @@ ecs =
         result <- runSystem ()
         (== Sum 1000) result @? "Result is false"
         result <- runSystem ()
-        (== Sum 3000) result @? "Result is false"
+        (== Sum 3000) result @? "Result is false",
+      testCase "Delete" $ do
+        w <- newWorld 10000
+        init <- compileSystem (for [0 .. 9] (\_ -> pure (Position 0) >>> newEntity)) w
+        entities <- init ()
+        delete <- compileSystem deleteEntity w
+        forM_ (take 4 entities) delete
+        countEntities <- compileSystem (cfold $ \(e :: Entity) -> Sum 1) w
+        countPositions <- compileSystem (cfold $ \(Position _) -> Sum 1) w
+
+        entitiesAmount <- countEntities ()
+        positionAmount <- countPositions ()
+
+        (== Sum 6) entitiesAmount @? "Entity amount is false"
+        (== Sum 6) positionAmount @? "Position amount is false"
     ]
 
 sparseSet :: TestTree

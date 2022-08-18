@@ -1,34 +1,36 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 
-module Hero.World (
-  World(..),
-  newWorld,
-  worldComponentId,
-  worldComponent,
-  worldNewEntity
-) where
+module Hero.World
+  ( World (..),
+    newWorld,
+    worldComponentId,
+    worldComponent,
+    worldNewEntity,
+  )
+where
 
+import Data.Kind (Type)
 import Data.Word (Word32)
 import Hero.Component
   ( Component,
     ComponentId,
-    Store',
+    ComponentMakeStore,
     Store,
+    Store',
     Stores,
     getComponentId,
     getStore,
     newStores,
-    ComponentMakeStore
   )
 import Hero.Entity
   ( Entities,
     Entity,
     MaxEntities (..),
     newEntities,
-    newEntity,
+    entitiesNew,
   )
-import Data.Kind (Type)
 
+-- | A world holds all entities and their components.
 data World = World
   { worldStores :: !Stores,
     worldEntities :: !Entities,
@@ -53,5 +55,5 @@ worldComponent !w = getComponentId @component (worldStores w) (worldMaxEntities 
 {-# INLINE worldComponent #-}
 
 worldNewEntity :: World -> IO Entity
-worldNewEntity !world = newEntity (worldMaxEntities world) (worldEntities world)
+worldNewEntity !world = entitiesNew (worldMaxEntities world) (worldEntities world)
 {-# INLINE worldNewEntity #-}

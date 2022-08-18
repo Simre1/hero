@@ -1,4 +1,4 @@
-module Hero.Entity (Entity(..), MaxEntities(..), global, Entities, newEntities, newEntity, removeEntity, forEntities, entityAmount) where
+module Hero.Entity (Entity(..), MaxEntities(..), global, Entities, newEntities, entitiesNew, entitiesDelete, entitiesFor, entitiesAmount) where
 
 import Data.Coerce (coerce)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
@@ -24,8 +24,8 @@ newEntities (MaxEntities max) = do
   lastId <- newIORef 0
   pure $ Entities set lastId
 
-newEntity :: MaxEntities -> Entities -> IO Entity
-newEntity (MaxEntities max) (Entities entities lastIdRef) = do
+entitiesNew :: MaxEntities -> Entities -> IO Entity
+entitiesNew (MaxEntities max) (Entities entities lastIdRef) = do
   lastId <- readIORef lastIdRef
   nextId <- findNext lastId 1
   writeIORef lastIdRef nextId
@@ -38,19 +38,19 @@ newEntity (MaxEntities max) (Entities entities lastIdRef) = do
       if contained
         then findNext last ((distance + 1) ^ 2)
         else pure next
-{-# INLINE newEntity #-}
+{-# INLINE entitiesNew #-}
 
-removeEntity :: Entities -> Entity -> IO ()
-removeEntity (Entities entities _) (Entity key) = S.remove entities key
-{-# INLINE removeEntity #-}
+entitiesDelete :: Entities -> Entity -> IO ()
+entitiesDelete (Entities entities _) (Entity key) = S.remove entities key
+{-# INLINE entitiesDelete #-}
 
-forEntities :: MonadIO m => Entities -> (Entity -> m ()) -> m ()
-forEntities (Entities entities _) f = S.for entities (coerce f)
-{-# INLINE forEntities #-}
+entitiesFor :: MonadIO m => Entities -> (Entity -> m ()) -> m ()
+entitiesFor (Entities entities _) f = S.for entities (coerce f)
+{-# INLINE entitiesFor #-}
 
-entityAmount :: Entities -> IO Int
-entityAmount (Entities entities _) = S.size entities
-{-# INLINE entityAmount #-}
+entitiesAmount :: Entities -> IO Int
+entitiesAmount (Entities entities _) = S.size entities
+{-# INLINE entitiesAmount #-}
 
 -- | 'global' is an entity which is not part of normal component store but can
 -- be used to access global components like the 'Global' store.

@@ -1,3 +1,10 @@
+{-|
+Module      : Hero
+Description : An ECS implementation in Haskell focused on performance
+Copyright   : (c) Reitinger Simon, 2022
+License     : MIT
+-}
+
 module Hero
   ( -- * World
     World,
@@ -27,6 +34,7 @@ module Hero
     cfoldl,
     cfoldr,
     newEntity,
+    deleteEntity,
     liftSystem,
 
     -- * Query

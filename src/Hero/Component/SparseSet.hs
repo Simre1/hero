@@ -18,6 +18,7 @@ import Hero.Component
     ComponentIterate (..),
     ComponentMakeStore (..),
     ComponentPut (..),
+    ComponentStore (componentEntityDelete)
   )
 import Hero.Entity
   ( Entity (Entity),
@@ -34,6 +35,9 @@ newtype UnboxedSparseSet a = UnboxedSparseSet (SU.SparseSetUnboxed a)
 -- array) and the second should be the maximum amount of live entities for the component (size of the dense array).
 unboxedSparseSet :: Unbox a => Word32 -> Word32 -> IO (UnboxedSparseSet a)
 unboxedSparseSet global component = UnboxedSparseSet <$> SU.create global component
+
+instance Unbox a => ComponentStore a UnboxedSparseSet where
+  componentEntityDelete (UnboxedSparseSet set) entity = SU.remove set (coerce entity)
 
 instance (Unbox a) => ComponentGet a UnboxedSparseSet where
   componentContains (UnboxedSparseSet set) entity = SU.contains set (coerce entity)
@@ -61,6 +65,9 @@ instance (Unbox a) => ComponentMakeStore a UnboxedSparseSet where
 
 -- | Component store backed by a storable sparse set. Can be used as a 'Store'.
 newtype StorableSparseSet a = StorableSparseSet (SV.SparseSetStorable a)
+
+instance Storable a => ComponentStore a StorableSparseSet where
+  componentEntityDelete (StorableSparseSet set) entity = SV.remove set (coerce entity)
 
 instance (Storable a) => ComponentGet a StorableSparseSet where
   componentContains (StorableSparseSet set) entity = SV.contains set (coerce entity)
@@ -93,6 +100,10 @@ instance (Storable a) => ComponentMakeStore a StorableSparseSet where
 -- | Component store backed by a boxed sparse set. Can be used as a 'Store'. The storable version is faster and should be
 -- used when possible.
 newtype BoxedSparseSet a = BoxedSparseSet (SB.SparseSetBoxed a)
+
+instance ComponentStore a BoxedSparseSet where
+  componentEntityDelete (BoxedSparseSet set) entity = SB.remove set (coerce entity)
+
 
 instance (Storable a) => ComponentGet a BoxedSparseSet where
   componentContains (BoxedSparseSet set) entity = SB.contains set (coerce entity)

@@ -15,6 +15,7 @@ module Hero.Component
     -- Store have different capabilities and not every store implements every operation.
     -- For example, you cannot set or delete the Entity component.
     ComponentId,
+    ComponentStore (..),
     ComponentMakeStore (..),
     ComponentGet (..),
     ComponentPut (..),
@@ -25,10 +26,13 @@ module Hero.Component
     newStores,
     getComponentId,
     getStore,
+    eachStore,
   )
 where
 
+import Control.Monad (forM_)
 import Control.Monad.IO.Class (MonadIO)
+import Data.Constraint
 import Data.IORef
   ( IORef,
     modifyIORef,
@@ -49,17 +53,26 @@ import Unsafe.Coerce (unsafeCoerce)
 
 -- | 'ComponentId' is unique to a component within the context of a World. Do not
 -- use the same 'ComponentId' with different worlds.
-newtype ComponentId = ComponentId {unwrapComponentId :: Int} deriving (Show, Eq)
+newtype ComponentId = ComponentId {unwrapComponentId :: Int} deriving (Show, Eq, Ord)
 
 -- | A component is a Haskell datatype usually containing raw data.
 -- For example `data Position = Position Float Float`
-class Typeable component => Component component where
+class (Typeable component, ComponentStore component (Store component)) => Component component where
   type Store component :: Type -> Type
   makeStore :: MaxEntities -> IO (Store' component)
   default makeStore :: ComponentMakeStore component (Store component) => MaxEntities -> IO (Store' component)
   makeStore = componentMakeStore
 
 type Store' component = Store component component
+
+data Stores
+  = Stores
+      (IORef (V.IOVector (WrappedStore, WrappedDict)))
+      (IORef (M.Map SomeTypeRep ComponentId))
+
+-- | Contains methods that every store must have.
+class ComponentStore component store where
+  componentEntityDelete :: store component -> Entity -> IO ()
 
 -- | The default implementation for 'makeStore'. It can be overriden by providing a
 -- 'makeStore' method for a component.
@@ -80,12 +93,18 @@ class ComponentGet component store => ComponentIterate component store where
   componentIterate :: MonadIO m => store component -> (Entity -> component -> m ()) -> m ()
   componentMembers :: store component -> IO Int
 
-newtype WrappedStorage = WrappedStorage (forall component. Store' component)
+newtype WrappedStore = WrappedStore (forall component. Store' component)
 
-unwrapWrappedStorage :: forall component. WrappedStorage -> Store' component
-unwrapWrappedStorage (WrappedStorage s) = s @component
+newtype WrappedDict = WrappedDict (forall component. Dict (ComponentStore component (Store component)))
 
-data Stores = Stores (IORef (V.IOVector WrappedStorage)) (IORef (M.Map SomeTypeRep ComponentId))
+unwrapStore :: forall component. WrappedStore -> Store' component
+unwrapStore (WrappedStore s) = s @component
+
+unwrapDict :: forall component. WrappedDict -> Dict (ComponentStore component (Store component))
+unwrapDict (WrappedDict s) = s @component
+
+getDict :: forall component. Component component => WrappedDict
+getDict = WrappedDict $ unsafeCoerce $ Dict @(ComponentStore component (Store component))
 
 addStore :: forall component. Component component => Stores -> Store' component -> IO ComponentId
 addStore (Stores storeVecRef mappingsRef) store = do
@@ -93,20 +112,22 @@ addStore (Stores storeVecRef mappingsRef) store = do
   storeVec <- readIORef storeVecRef
   let rep = someTypeRep $ Proxy @component
       maybeMapping = M.lookup rep mappings
-      wrappedStore = (WrappedStorage $ unsafeCoerce store)
+      wrappedStore = (WrappedStore $ unsafeCoerce store)
+      wrappedDict = getDict @component
   case maybeMapping of
     Nothing -> do
       let newId = M.size mappings
           storeSize = V.length storeVec
       if newId < storeSize
-        then V.unsafeWrite storeVec newId wrappedStore
+        then V.unsafeWrite storeVec newId (wrappedStore, wrappedDict)
         else do
           newStoreVec <- V.grow storeVec (storeSize `quot` 2)
-          V.unsafeWrite newStoreVec newId wrappedStore
+          V.unsafeWrite newStoreVec newId (wrappedStore, wrappedDict)
           writeIORef storeVecRef newStoreVec
       modifyIORef mappingsRef $ M.insert rep (ComponentId newId)
       pure $ ComponentId newId
-    Just i -> V.unsafeWrite storeVec (unwrapComponentId i) wrappedStore *> pure i
+    Just i -> do
+      V.unsafeWrite storeVec (unwrapComponentId i) (wrappedStore, wrappedDict) *> pure i
 
 addComponentStore :: forall (component :: Type). Component component => Stores -> MaxEntities -> IO ComponentId
 addComponentStore stores@(Stores storeVec mappings) max = do
@@ -117,7 +138,7 @@ addComponentStore stores@(Stores storeVec mappings) max = do
 -- they were created with.
 getStore :: forall component. Stores -> ComponentId -> IO (Store' component)
 getStore (Stores storeVecRef _) componentId =
-  readIORef storeVecRef >>= \vec -> unwrapWrappedStorage @component <$> V.unsafeRead vec (unwrapComponentId componentId)
+  readIORef storeVecRef >>= \vec -> unwrapStore @component . fst <$> V.unsafeRead vec (unwrapComponentId componentId)
 
 -- | Gets the component id for a component. It sets up the component store if it does not exist yet within the given world.
 getComponentId :: forall (component :: Type). Component component => Stores -> MaxEntities -> IO ComponentId
@@ -132,3 +153,15 @@ getComponentId stores@(Stores _ mappingsRef) max = do
 -- | 'Stores' holds all component stores.
 newStores :: IO Stores
 newStores = Stores <$> (V.new 10 >>= newIORef) <*> newIORef M.empty
+
+-- | Do something on each store
+eachStore :: Stores -> (forall component. ComponentStore component (Store component) => Store' component -> IO ()) -> IO ()
+eachStore (Stores storeVec mappingsRef) f = do
+  stores <- readIORef storeVec
+  mappings <- readIORef mappingsRef
+  forM_ [0 .. M.size mappings - 1] $ \i -> do
+    (wrappedStore, wrappedDict) <- V.unsafeRead stores i
+    g (unwrapDict wrappedDict) (unwrapStore wrappedStore)
+  where
+    g :: Dict (ComponentStore component (Store component)) -> Store' component -> IO ()
+    g d s = withDict d $ f s

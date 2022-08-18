@@ -33,8 +33,10 @@ import Hero.Component
     ComponentGet (..),
     ComponentIterate (..),
     ComponentPut (..),
+    ComponentStore (..),
+    eachStore,
   )
-import Hero.Entity (Entity, entityAmount, forEntities)
+import Hero.Entity (Entity, entitiesAmount, entitiesFor, entitiesDelete)
 import Hero.World
   ( World (worldEntities, worldStores),
     worldComponent,
@@ -170,6 +172,16 @@ newEntity = System $ \w -> do
     liftIO $ put e c
     pure e
 {-# INLINE newEntity #-}
+
+-- | Removes an entity and all its components
+deleteEntity :: forall a m. (MonadIO m) => System m Entity ()
+deleteEntity = System $ \w -> do
+  let stores = worldStores w
+  let entities = worldEntities w
+  pure $! \e -> liftIO $ do
+    eachStore stores $ \store -> componentEntityDelete store e
+    entitiesDelete entities e
+{-# INLINE deleteEntity #-}
 
 -- | A Query is a function which can operate on the components of a world. In contrast to
 -- System, a query contains operations which operate on a single entity. System contains operations
@@ -317,9 +329,9 @@ instance QueryDelete False () where
 
 instance QueryIterate False () where
   queryFor w = do
-    pure $! \f -> forEntities (worldEntities w) $! \e -> f e ()
+    pure $! \f -> entitiesFor (worldEntities w) $! \e -> f e ()
   queryMembers w = do
-    pure $! entityAmount (worldEntities w)
+    pure $! entitiesAmount (worldEntities w)
   {-# INLINE queryFor #-}
   {-# INLINE queryMembers #-}
 
@@ -331,9 +343,9 @@ instance QueryGet False Entity where
 
 instance QueryIterate False Entity where
   queryFor w = do
-    pure $! \f -> forEntities (worldEntities w) $! \e -> f e e
+    pure $! \f -> entitiesFor (worldEntities w) $! \e -> f e e
   queryMembers w = do
-    pure $! entityAmount (worldEntities w)
+    pure $! entitiesAmount (worldEntities w)
   {-# INLINE queryFor #-}
   {-# INLINE queryMembers #-}
 
