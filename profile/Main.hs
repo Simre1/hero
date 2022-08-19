@@ -44,7 +44,7 @@ main = do
 
 physicsWorld :: IO World
 physicsWorld = do
-  world <- newWorld 10000
+  world <- createWorld 10000
 
   make <- compileSystem newEntity world
   

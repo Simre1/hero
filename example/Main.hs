@@ -18,7 +18,7 @@ instance Component Velocity where
 
 main :: IO ()
 main = do
-  world <- newWorld 10000
+  world <- createWorld 10000
   runSystem <- compileSystem system world
   runSystem ()
 

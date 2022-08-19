@@ -34,15 +34,16 @@ library
         Hero.Component,
         Hero.Entity,
         Hero.System,
-        Hero.Component.SparseSet,
-        Hero.Component.Global
+        Hero.Component.Store.SparseSet,
+        Hero.Component.Store.Global,
+        Hero.Component.Basic
+
 
 
     default-language: GHC2021
     default-extensions:
         DataKinds
         TypeFamilies
-        Strict
         MagicHash
     ghc-options: -O2
 

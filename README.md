@@ -56,7 +56,7 @@ instance Component Velocity where
 main :: IO ()
 main = do
   -- Create the world with a maximum of 10000 live entities
-  world <- newWorld 10000
+  world <- createWorld 10000
 
   -- Compile the system
   runSystem <- compileSystem system world

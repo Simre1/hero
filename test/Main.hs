@@ -37,7 +37,7 @@ ecs =
   testGroup
     "ECS"
     [ testCase "Iteration" $ do
-        w <- newWorld 10000
+        w <- createWorld 10000
         init <- compileSystem (for_ [0 .. 999] (\_ -> pure (Position 0, Velocity 1) >>> newEntity)) w
         init ()
         let system =
@@ -50,7 +50,7 @@ ecs =
         result <- runSystem ()
         (== Sum 3000) result @? "Result is false",
       testCase "Delete" $ do
-        w <- newWorld 10000
+        w <- createWorld 10000
         init <- compileSystem (for [0 .. 9] (\_ -> pure (Position 0) >>> newEntity)) w
         entities <- init ()
         delete <- compileSystem deleteEntity w

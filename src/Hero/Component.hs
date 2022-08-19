@@ -14,6 +14,7 @@ module Hero.Component
 
     -- Store have different capabilities and not every store implements every operation.
     -- For example, you cannot set or delete the Entity component.
+    MakeStore(..),
     ComponentId,
     ComponentStore (..),
     ComponentMakeStore (..),
@@ -26,13 +27,14 @@ module Hero.Component
     newStores,
     getComponentId,
     getStore,
+    addStore,
     eachStore,
   )
 where
 
 import Control.Monad (forM_)
 import Control.Monad.IO.Class (MonadIO)
-import Data.Constraint
+import Data.Constraint (Dict (..), withDict)
 import Data.IORef
   ( IORef,
     modifyIORef,
@@ -55,13 +57,19 @@ import Unsafe.Coerce (unsafeCoerce)
 -- use the same 'ComponentId' with different worlds.
 newtype ComponentId = ComponentId {unwrapComponentId :: Int} deriving (Show, Eq, Ord)
 
+-- | You can either set up the store in `IO` when its used or manually set it up.
+-- Manual setup allows you to use other app resources which might be needed by a store.
+-- Keep in mind that you need to set up manually created stores before
+-- you can use them. There is no static checking that you create stores before you use them.
+data MakeStore component = MakeStore (IO (Store' component)) | ManualMakeStore
+
 -- | A component is a Haskell datatype usually containing raw data.
 -- For example `data Position = Position Float Float`
 class (Typeable component, ComponentStore component (Store component)) => Component component where
   type Store component :: Type -> Type
-  makeStore :: MaxEntities -> IO (Store' component)
-  default makeStore :: ComponentMakeStore component (Store component) => MaxEntities -> IO (Store' component)
-  makeStore = componentMakeStore
+  makeStore :: MaxEntities -> MakeStore component
+  default makeStore :: ComponentMakeStore component (Store component) => MaxEntities -> MakeStore component
+  makeStore = MakeStore . componentMakeStore
 
 type Store' component = Store component component
 
@@ -131,8 +139,13 @@ addStore (Stores storeVecRef mappingsRef) store = do
 
 addComponentStore :: forall (component :: Type). Component component => Stores -> MaxEntities -> IO ComponentId
 addComponentStore stores@(Stores storeVec mappings) max = do
-  store <- makeStore @component max
-  addStore @component stores store
+  case makeStore @component max of
+    MakeStore make -> make >>= addStore @component stores
+    ManualMakeStore ->
+      error $
+        "Tried to create a store for component "
+          <> show (someTypeRep (Proxy @component))
+          <> ", but it has a custom creation mechanism. You need to create the store yourself before using it."
 
 -- | Gets the store associated within a component id. Remember that component ids must be used with the world
 -- they were created with.

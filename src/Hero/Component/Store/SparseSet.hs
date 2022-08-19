@@ -1,4 +1,4 @@
-module Hero.Component.SparseSet (
+module Hero.Component.Store.SparseSet (
   StorableSparseSet,
   storableSparseSet,
   UnboxedSparseSet,

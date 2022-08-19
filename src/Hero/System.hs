@@ -83,6 +83,11 @@ instance Applicative m => Applicative (System m i) where
   {-# INLINE pure #-}
   {-# INLINE (<*>) #-}
 
+-- | Allows code to be executed during the compilation stage.
+-- `IO a` is only executed once and the `a` is the permanent output of the system.
+withSetup :: Applicative m => (World -> IO a) -> System m i a
+withSetup f = System $ \w -> f w >>= \a -> pure $ \_ -> pure a
+
 -- | Lifs a normal function into a System.
 liftSystem :: Applicative m => (a -> m b) -> System m a b
 liftSystem f = System $ \_ -> pure $ f
@@ -97,10 +102,10 @@ compileSystem (System f) w = f w
 -- | Iterates over all entities with the requested components and sets the components calculated by the
 -- given function
 cmap ::
-  forall a b m.
+  forall a b m i.
   (QCI a, QCP b, MonadIO m) =>
   (a -> b) ->
-  System m () ()
+  System m i ()
 cmap f =
   System
     ( \w -> do
@@ -110,8 +115,23 @@ cmap f =
     )
 
 -- | Iterates over all entities with the requested components and sets the components calculated by the
+-- given function
+cmap' ::
+  forall a b i m.
+  (QCI a, QCP b, MonadIO m) =>
+  (i -> a -> b) ->
+  System m i ()
+cmap' f =
+  System
+    ( \w -> do
+        for <- queryFor @(S a) @a w
+        put <- queryPut @(S b) @b w
+        pure $ \i -> for $ \e a -> liftIO $ put e $! (f i a)
+    )
+
+-- | Iterates over all entities with the requested components and sets the components calculated by the
 -- given monadic function
-cmapM :: forall a b m. (QCI a, QCP b, MonadIO m) => (a -> m b) -> System m () ()
+cmapM :: forall a b i m. (QCI a, QCP b, MonadIO m) => (a -> m b) -> System m i ()
 cmapM f =
   System
     ( \w -> do
@@ -120,8 +140,19 @@ cmapM f =
         pure $ \_ -> for $ \e a -> f a >>= liftIO . put e
     )
 
+-- | Iterates over all entities with the requested components and sets the components calculated by the
+-- given monadic function
+cmapM' :: forall a b i m. (QCI a, QCP b, MonadIO m) => (i -> a -> m b) -> System m i ()
+cmapM' f =
+  System
+    ( \w -> do
+        for <- queryFor @(S a) @a w
+        put <- queryPut @(S b) @b w
+        pure $ \i -> for (\e a -> f i a >>= liftIO . put e)
+    )
+
 -- | Iterates over all entities with the requested components and folds the components.
-cfold :: forall a o m. (Monoid o, QCI a, MonadIO m) => (a -> o) -> System m () o
+cfold :: forall a o m i. (Monoid o, QCI a, MonadIO m) => (a -> o) -> System m i o
 cfold f = System $ \w -> do
   for <- queryFor @(S a) @a w
   members <- queryMembers @(S a) @a w
@@ -132,14 +163,37 @@ cfold f = System $ \w -> do
       liftIO $ modifyIORef' ref (<> o)
     liftIO $ readIORef ref
 
+-- | Iterates over all entities with the requested components and folds the components.
+cfold' :: forall a o m i. (Monoid o, QCI a, MonadIO m) => (i -> a -> o) -> System m i o
+cfold' f = System $ \w -> do
+  for <- queryFor @(S a) @a w
+  members <- queryMembers @(S a) @a w
+  pure $! \i -> do
+    ref <- liftIO $ newIORef (mempty :: o)
+    for $! \e a -> do
+      let o = f i a
+      liftIO $ modifyIORef' ref (<> o)
+    liftIO $ readIORef ref
+
 -- | Iterates over all entities with the requested components and monadically folds the components.
-cfoldM :: forall a o m. (Monoid o, QCI a, MonadIO m) => (a -> m o) -> System m () o
+cfoldM :: forall a o i m. (Monoid o, QCI a, MonadIO m) => (a -> m o) -> System m i o
 cfoldM f = System $ \w -> do
   for <- queryFor @(S a) @a w
   pure $! \i2 -> do
     ref <- liftIO $ newIORef (mempty :: o)
     for $! \e a -> do
       o <- f a
+      liftIO $ modifyIORef ref (<> o)
+    liftIO $ readIORef ref
+
+-- | Iterates over all entities with the requested components and monadically folds the components.
+cfoldM' :: forall a o i m. (Monoid o, QCI a, MonadIO m) => (i -> a -> m o) -> System m i o
+cfoldM' f = System $ \w -> do
+  for <- queryFor @(S a) @a w
+  pure $! \i -> do
+    ref <- liftIO $ newIORef (mempty :: o)
+    for $! \e a -> do
+      o <- f i a
       liftIO $ modifyIORef ref (<> o)
     liftIO $ readIORef ref
 
@@ -246,6 +300,7 @@ singleQuery (Query makeQ) = System $ \w -> do
 -- Lifts a normal function into a Query
 liftQuery :: Applicative m => (a -> m b) -> Query m a b
 liftQuery f = Query $ \_ -> pure $ \_ a -> f a
+{-# INLINE liftQuery #-}
 
 instance Monad m => Category (Query m) where
   id = Query $ \_ -> pure $ \_ i -> pure i

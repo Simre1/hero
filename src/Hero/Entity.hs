@@ -9,7 +9,7 @@ import Control.Monad.IO.Class (MonadIO)
 
 -- An entity is an object within a world with components. 'Entity' can be used to access the components of a world.
 -- Working the the underlying 'World32' is probably not a good idea.
-newtype Entity = Entity Word32
+newtype Entity = Entity Word32 deriving Show
 
 -- | MaxEntities should be the maximum amount of live entities within a world. Lower max entity count
 -- saves memory.

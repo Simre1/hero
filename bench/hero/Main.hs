@@ -31,7 +31,7 @@ instance Component Acceleration where
 
 main :: IO ()
 main = do
-  world <- newWorld 10000
+  world <- createWorld 10000
   init <- compileSystem initEntities world
   run <- compileSystem physics world
 

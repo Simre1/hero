@@ -1,0 +1,1 @@
+packages: *.cabal, hero-sdl2/hero-sdl2.cabal

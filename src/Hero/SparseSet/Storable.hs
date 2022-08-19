@@ -64,7 +64,8 @@ contains (SparseSetStorable sparse _ _ _) i = do
 {-# INLINE contains #-}
 
 size :: SparseSetStorable a -> IO Int
-size (SparseSetStorable _ _ _ sizeRef) = readIORef sizeRef
+size (SparseSetStorable _ _ _ sizeRef) = do
+  readIORef sizeRef
 {-# INLINE size #-}
 
 lookup :: VM.Storable a => SparseSetStorable a -> Word32 -> IO (Maybe a)
