@@ -20,6 +20,7 @@ import Data.IORef
     modifyIORef',
     newIORef,
     readIORef,
+    writeIORef,
   )
 import Data.Monoid
   ( Dual (Dual, getDual),
@@ -216,6 +217,34 @@ cfoldl f b = System $ \w -> do
       liftIO $ modifyIORef' ref $ \b -> f b a
     liftIO $ readIORef ref
 {-# INLINE cfoldl #-}
+
+-- | Forwards the input of a system to its output. The previous output is ignored.
+-- Look at (&&&) if you do not want to ignore the output.
+forward :: Functor m => System m i o -> System m i i
+forward (System makeS) = System $ \w -> do
+  s <- makeS w
+  pure $ \i -> i <$ s i
+{-# INLINE forward #-}
+
+-- | Executes a system only once and caches the output, then returns that output
+-- continously.
+once :: MonadIO m => System m i o -> System m i o
+once (System makeS) = System $ \w -> do
+  s <- makeS w
+  ref <- newIORef (\_ -> pure undefined)
+  writeIORef ref $ \i -> s i >>= \o -> liftIO (writeIORef ref (\_ -> pure o)) >> pure o
+  pure $ \i -> liftIO (readIORef ref) >>= \f -> f i
+{-# INLINE once #-}
+
+sput :: forall i m. (QCP i, MonadIO m) => System m (Entity, i) ()
+sput = System $ \w -> do
+  put <- queryPut @(S i) w
+  pure $ \(e, i) -> liftIO $ put e i
+
+sdelete :: forall i m. (QCD i, MonadIO m) => System m Entity ()
+sdelete = System $ \w -> do
+  delete <- queryDelete @(S i) @i w
+  pure $ \e -> liftIO $ delete e
 
 -- | Creates a new entity with the given components
 newEntity :: forall a m. (QCP a, MonadIO m) => System m a Entity
