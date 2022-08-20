@@ -16,18 +16,22 @@ import Data.IORef
     readIORef,
   )
 import Hero.Component.Capabilities
-    ( ComponentIterate(..),
-      ComponentDelete(..),
-      ComponentPut(..),
-      ComponentGet(..) )
+  ( ComponentDelete (..),
+    ComponentGet (..),
+    ComponentIterate (..),
+    ComponentPut (..),
+  )
 import Hero.Component.Component
-    ( Store', Component(..), ComponentStore(componentEntityDelete) )
+  ( Component (..),
+    ComponentStore (componentEntityDelete),
+    Store',
+  )
+import Hero.Component.Store.AllStores qualified as AllStores
 import Hero.Entity (Entity, entitiesAmount, entitiesDelete, entitiesFor)
 import Hero.System.System (System (..))
 import Hero.World qualified as World
-import Prelude hiding ((.))
 import Optics.Core
-import qualified Hero.Component.Store.AllStores as AllStores
+import Prelude hiding ((.))
 
 -- | Low-level store setup used when implementing a custom `withStoreConfig`. Each store may only be set up once!
 addStore :: (Applicative m, Component component) => Store' component -> System m i i
@@ -284,11 +288,13 @@ qdelete = Query $ \w -> do
   pure $! \e _ -> liftIO $ delete e
 {-# INLINE qdelete #-}
 
+-- | Type family specifying the cases which are not components. S a ~ True, then a should be a component
 type family S a where
   S () = False
   S Entity = False
   S (a, b) = False
   S (a, b, c) = False
+  S (Maybe a) = False
   S _ = True
 
 -- | Gets components from the world
@@ -338,6 +344,42 @@ instance QueryDelete False () where
 instance QueryIterate False () where
   queryFor w = do
     pure $! \f -> entitiesFor (w ^. #entities) $! \e -> f e ()
+  queryMembers w = do
+    pure $! entitiesAmount (w ^. #entities)
+  {-# INLINE queryFor #-}
+  {-# INLINE queryMembers #-}
+
+instance QCG a => QueryGet False (Maybe a) where
+  queryContains w = pure $! \_ -> pure True
+  queryGet w = do
+    contains <- queryContains @(S a) @a w
+    get <- queryGet @(S a) @a w
+    pure $ \e ->
+      contains e >>= \c ->
+        if c
+          then Just <$> get e
+          else pure Nothing
+  {-# INLINE queryContains #-}
+  {-# INLINE queryGet #-}
+
+instance (QCP a, QCD a) => QueryPut False (Maybe a) where
+  queryPut w = do
+    delete <- queryDelete @(S a) @a w
+    put <- queryPut @(S a) w
+    pure $! \e -> maybe (delete e) (put e)
+  {-# INLINE queryPut #-}
+
+instance QCG a => QueryIterate False (Maybe a) where
+  queryFor w = do
+    get <- queryGet @(S a) @a w
+    contains <- queryContains @(S a) @a w
+
+    pure $! \f ->
+      entitiesFor (w ^. #entities) $! \e -> do
+        c <- liftIO $ contains e
+        if c
+          then liftIO (get e) >>= f e . Just
+          else f e Nothing
   queryMembers w = do
     pure $! entitiesAmount (w ^. #entities)
   {-# INLINE queryFor #-}
