@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 
-module Hero.SimpleRender where
+module Hero.SDL2.Render where
 
 import Control.Category
 import Control.Monad.IO.Class

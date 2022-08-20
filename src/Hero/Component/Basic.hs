@@ -41,6 +41,12 @@ instance Num Position2D where
   fromInteger x = let x' = fromIntegral x in Position2D x' x'
   negate (Position2D x y) = Position2D (negate x) (negate y)
 
+-- | Component for 2D rotation in radian which uses sparse sets for storage
+newtype Rotation2D = Rotation2D Float deriving (Show, Eq, Ord, Storable)
+
+instance Component Rotation2D where
+  type Store Rotation2D = StorableSparseSet
+
 -- | Global component which has the delta time
 newtype TimeDelta = TimeDelta Double
 

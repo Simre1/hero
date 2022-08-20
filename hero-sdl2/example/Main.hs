@@ -5,7 +5,7 @@ module Main where
 import Control.Monad (forever)
 import Data.Foldable (for_)
 import Hero
-import Hero.SimpleRender
+import Hero.SDL2.Render
 import Linear.V2
 import Linear.V4
 import Optics.Core
