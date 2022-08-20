@@ -16,6 +16,7 @@ import SDL qualified
 import SDL.Video qualified as SDL
 import SDL.Video.Renderer qualified as SDL
 import Prelude hiding (id, (.))
+import Hero.Component.Store
 
 data Graphics = Graphics
   { graphicsRenderer :: {-# UNPACK #-} !SDL.Renderer,
@@ -44,7 +45,11 @@ instance Component Render where
 
 instance Component Graphics where
   type Store Graphics = Global
-  makeStore _ = ManualMakeStore
+
+instance ComponentCreateStore Graphics where
+  type Config Graphics = GraphicsConfig
+  withStoreConfig graphicsConfig system = runGraphics graphicsConfig system
+  {-# INLINE withStoreConfig #-}
 
 createWindow :: GraphicsConfig -> IO Graphics
 createWindow graphicsConfig = do
@@ -61,20 +66,21 @@ data GraphicsConfig = GraphicsConfig
   }
 
 defaultGraphics :: GraphicsConfig
-defaultGraphics = GraphicsConfig {
-  windowName = pack "Hero App",
-  windowConfig = SDL.defaultWindow,
-  graphicsVSync = True,
-  virtualWindowSize = V2 800 600
-}
+defaultGraphics =
+  GraphicsConfig
+    { windowName = pack "Hero App",
+      windowConfig = SDL.defaultWindow,
+      graphicsVSync = True,
+      virtualWindowSize = V2 800 600
+    }
 
 runGraphics :: forall i o m. MonadIO m => GraphicsConfig -> System m i o -> System m i o
-runGraphics graphicsConfig system = setup &&& id >>> second system >>> first graphics >>> arr snd
+runGraphics graphicsConfig system = setup $ second system >>> first graphics >>> arr snd
   where
-    setup :: System m i Graphics
-    setup = withSetup $ \world -> do
+    setup :: System m (Graphics, i) o -> System m i o
+    setup system = withSetup $ \world -> do
       graphics <- createWindow graphicsConfig
-      makeGlobal graphics >>= worldAddComponent @Graphics world
+      graphicsStore <- createStore' @Graphics graphics
       pure graphics
     graphics :: System m Graphics ()
     graphics =
@@ -92,5 +98,5 @@ runGraphics graphicsConfig system = setup &&& id >>> second system >>> first gra
                   Rectangle -> SDL.fillRect renderer (Just $ SDL.Rectangle position size)
           present = liftSystem (\g@(Graphics renderer _) -> SDL.present renderer)
           clear = liftSystem (\g@(Graphics renderer _) -> SDL.rendererDrawColor renderer SDL.$= (V4 0 0 0 255) >> SDL.clear renderer *> pure g)
-      in clear >>> id &&& render >>> arr fst >>> present
+       in clear >>> id &&& render >>> arr fst >>> present
 {-# INLINE runGraphics #-}

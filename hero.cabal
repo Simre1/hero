@@ -22,21 +22,39 @@ maintainer:         simre4775@gmail.com
 extra-source-files: CHANGELOG.md
 
 library
-    build-depends:    base >4.13.0.0, vector > 0.12, transformers, containers, data-default, constraints
+    build-depends:    
+        base >4.13.0.0,
+        vector > 0.12,
+        transformers,
+        containers,
+        data-default,
+        constraints,
+        optics-core
     hs-source-dirs:   src
     exposed-modules:
+        Hero,
+
         Hero.SparseSet.Unboxed,
         Hero.SparseSet.Storable,
         Hero.SparseSet.NoComponent,
         Hero.SparseSet.Boxed,
-        Hero,
+
         Hero.World,
-        Hero.Component,
+
         Hero.Entity,
-        Hero.System,
+
+        Hero.Component,
+        Hero.Component.Component,
+        Hero.Component.Capabilities,
+        Hero.Component.Basic,
+        Hero.Component.Store.AllStores,
         Hero.Component.Store.SparseSet,
         Hero.Component.Store.Global,
-        Hero.Component.Basic
+
+
+        Hero.System,
+        Hero.System.System,
+        Hero.System.ComponentFunctions
 
 
 
@@ -44,7 +62,9 @@ library
     default-extensions:
         DataKinds
         TypeFamilies
-        MagicHash
+        OverloadedLabels
+        DuplicateRecordFields
+        NoFieldSelectors
     ghc-options: -O2
 
 test-suite hero

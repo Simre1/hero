@@ -2,7 +2,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -fplugin=Foreign.Storable.Generic.Plugin #-}
 
-import Data.Foldable ( for_ )
+import Data.Foldable (for_)
 import Foreign.Storable.Generic (GStorable)
 import GHC.Generics (Generic)
 import Hero
@@ -42,8 +42,10 @@ main = do
     ]
 
 initEntities :: System IO () ()
-initEntities = for_ [0 .. 1000] $ \i ->
-  pure (Position 0 i, Velocity 0 0, Acceleration 1 0) >>> newEntity
+initEntities = for_
+      [0 .. 1000]
+      ( \i -> pure (Position 0 i, Velocity 0 0, Acceleration 1 0) >>> newEntity
+      )
 
 physics :: System IO () ()
 physics = do

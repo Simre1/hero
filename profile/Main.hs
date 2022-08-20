@@ -6,11 +6,7 @@ module Main where
 
 import Control.Monad
 import Control.Monad.IO.Class
-import Hero.Component
-import Hero.Component.SparseSet
-import Hero.Entity (Entity (..), MaxEntities (MaxEntities))
-import Hero.System
-import Hero.World
+import Hero
 import GHC.Generics (Generic)
 import Foreign.Storable.Generic (GStorable)
 import Control.Arrow

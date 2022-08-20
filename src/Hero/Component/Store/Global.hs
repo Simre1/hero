@@ -4,17 +4,14 @@ import Control.Arrow (Arrow (arr, (***)), (>>>))
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Data.Default (Default (def))
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
-import Hero.Component
-  ( Component (Store),
-    ComponentGet (..),
-    ComponentIterate (..),
-    ComponentMakeStore (..),
-    ComponentPut (..),
-    ComponentStore (..),
-    Store',
-  )
-import Hero.System (System, liftSystem, withSetup)
-import Hero.World (worldComponent)
+import Hero.Component.Capabilities
+    ( ComponentPut(..), ComponentGet(..) )
+import Hero.Component.Component
+    ( Component(..), ComponentStore(..) )
+import Hero.System.System
+    ( System, liftSystem, withSetup, withSetup' )
+import Hero.System.ComponentFunctions (addStore)
+import Hero.World qualified as World
 
 -- | Component store using an IORef for a single component instance.
 -- Every entity has the same component. Can be used as a 'Store'.
@@ -23,8 +20,8 @@ import Hero.World (worldComponent)
 newtype Global a = Global (IORef a)
 
 -- | Creates a global component store.
-makeGlobal :: a -> IO (Global a)
-makeGlobal a = Global <$> newIORef a
+addGlobal :: (Component a, Global ~ Store a) => MonadIO m => a -> System m i i
+addGlobal a = withSetup (\_ -> Global <$> newIORef a) addStore
 
 instance ComponentStore a Global where
   componentEntityDelete _ _ = pure ()
@@ -39,15 +36,12 @@ instance ComponentPut a Global where
   componentPut (Global ref) entity val = writeIORef ref val
   {-# INLINE componentPut #-}
 
-instance Default a => ComponentMakeStore a Global where
-  componentMakeStore _ = makeGlobal def
-
 getGlobal ::
   forall component m.
   (MonadIO m, Component component, Store component ~ Global) =>
   System m () component
 getGlobal =
-  withSetup (worldComponent @component)
+  withSetup' (World.getStore @component)
     >>> liftSystem (\(Global ref) -> liftIO $ readIORef ref)
 
 putGlobal ::
@@ -56,5 +50,5 @@ putGlobal ::
   System m component ()
 putGlobal =
   arr (\a -> ((), a))
-    >>> (withSetup (worldComponent @component)) *** arr id
+    >>> (withSetup' (World.getStore @component)) *** arr id
     >>> liftSystem (\(Global ref, i) -> liftIO $ writeIORef ref i)

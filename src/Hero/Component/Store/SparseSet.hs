@@ -1,25 +1,14 @@
-module Hero.Component.Store.SparseSet (
-  StorableSparseSet,
-  storableSparseSet,
-  UnboxedSparseSet,
-  unboxedSparseSet,
-  BoxedSparseSet,
-  boxedSparseSet
-) where
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
+module Hero.Component.Store.SparseSet where
+
+import Control.Monad.IO.Class (MonadIO)
 import Data.Coerce (coerce)
 import Data.Vector.Storable (Storable)
 import Data.Vector.Unboxed (Unbox)
 import Data.Word (Word32)
-import Hero.Component
-  ( Component,
-    ComponentDelete (..),
-    ComponentGet (..),
-    ComponentIterate (..),
-    ComponentMakeStore (..),
-    ComponentPut (..),
-    ComponentStore (componentEntityDelete)
-  )
+import Hero.Component.Capabilities
+import Hero.Component.Component
 import Hero.Entity
   ( Entity (Entity),
     MaxEntities (MaxEntities),
@@ -27,14 +16,38 @@ import Hero.Entity
 import Hero.SparseSet.Boxed qualified as SB
 import Hero.SparseSet.Storable qualified as SV
 import Hero.SparseSet.Unboxed qualified as SU
+import Hero.System (System, withSetup)
+import Hero.System.ComponentFunctions (addStore)
+import Hero.World as World hiding (addStore)
+import Optics.Core
+
+newtype SparseSetSize = SparseSetSize {denseSize :: Word32}
 
 -- | Component store backed by an unboxed sparse set. Can be used as a 'Store'.
 newtype UnboxedSparseSet a = UnboxedSparseSet (SU.SparseSetUnboxed a)
 
 -- | Creates an unboxed sparse set. The first parameter should be the maximum amount of live entities (size of the sparse
 -- array) and the second should be the maximum amount of live entities for the component (size of the dense array).
-unboxedSparseSet :: Unbox a => Word32 -> Word32 -> IO (UnboxedSparseSet a)
-unboxedSparseSet global component = UnboxedSparseSet <$> SU.create global component
+unboxedSparseSet' ::
+  forall component m i.
+  (Unbox component, MonadIO m, Component component, Store component ~ UnboxedSparseSet) =>
+  SparseSetSize ->
+  System m i i
+unboxedSparseSet' (SparseSetSize dense) =
+  withSetup
+    (\w -> let i = (coerce $ w ^. #maxEntities) in UnboxedSparseSet <$> SU.create @component i dense)
+    addStore
+
+-- | Creates an unboxed sparse set with the default size. If the component is not used by many entities, consider
+-- decreasing the size.
+unboxedSparseSet ::
+  forall component m i.
+  (Unbox component, MonadIO m, Component component, Store component ~ UnboxedSparseSet) =>
+  System m i i
+unboxedSparseSet =
+  withSetup
+    (\w -> let i = (coerce $ w ^. #maxEntities) in UnboxedSparseSet <$> SU.create @component i i)
+    addStore
 
 instance Unbox a => ComponentStore a UnboxedSparseSet where
   componentEntityDelete (UnboxedSparseSet set) entity = SU.remove set (coerce entity)
@@ -58,10 +71,6 @@ instance (Unbox a) => ComponentIterate a UnboxedSparseSet where
   componentMembers (UnboxedSparseSet set) = SU.size set
   {-# INLINE componentIterate #-}
   {-# INLINE componentMembers #-}
-
-
-instance (Unbox a) => ComponentMakeStore a UnboxedSparseSet where
-  componentMakeStore (MaxEntities global) = unboxedSparseSet global global
 
 -- | Component store backed by a storable sparse set. Can be used as a 'Store'.
 newtype StorableSparseSet a = StorableSparseSet (SV.SparseSetStorable a)
@@ -89,13 +98,28 @@ instance (Storable a) => ComponentIterate a StorableSparseSet where
   {-# INLINE componentIterate #-}
   {-# INLINE componentMembers #-}
 
--- | Creates a storable sparse set. The first parameter should be the maximum amount of live (size of the sparse
+-- | Creates a storable sparse set. The first parameter should be the maximum amount of live entities (size of the sparse
 -- array) and the second should be the maximum amount of live entities for the component (size of the dense array).
-storableSparseSet :: Storable a => Word32 -> Word32 -> IO (StorableSparseSet a)
-storableSparseSet global component = StorableSparseSet <$> SV.create global component
+storableSparseSet' ::
+  forall component m i.
+  (Storable component, MonadIO m, Component component, Store component ~ StorableSparseSet) =>
+  SparseSetSize ->
+  System m i i
+storableSparseSet' (SparseSetSize dense) =
+  withSetup
+    (\w -> let i = (w ^. #maxEntities ^. coerced) in StorableSparseSet <$> SV.create @component i dense)
+    addStore
 
-instance (Storable a) => ComponentMakeStore a StorableSparseSet where
-  componentMakeStore (MaxEntities global) = storableSparseSet global global
+-- | Creates a storable sparse set with the default size. If the component is not used by many entities, consider
+-- decreasing the size.
+storableSparseSet ::
+  forall component m i.
+  (Storable component, MonadIO m, Component component, Store component ~ StorableSparseSet) =>
+  System m i i
+storableSparseSet =
+  withSetup
+    (\w -> let i = (w ^. #maxEntities ^. coerced) in StorableSparseSet <$> SV.create @component i i)
+    addStore
 
 -- | Component store backed by a boxed sparse set. Can be used as a 'Store'. The storable version is faster and should be
 -- used when possible.
@@ -103,7 +127,6 @@ newtype BoxedSparseSet a = BoxedSparseSet (SB.SparseSetBoxed a)
 
 instance ComponentStore a BoxedSparseSet where
   componentEntityDelete (BoxedSparseSet set) entity = SB.remove set (coerce entity)
-
 
 instance ComponentGet a BoxedSparseSet where
   componentContains (BoxedSparseSet set) entity = SB.contains set (coerce entity)
@@ -127,8 +150,32 @@ instance ComponentIterate a BoxedSparseSet where
 
 -- | Creates a boxed sparse set. The first parameter should be the maximum amount of live entities (size of the sparse
 -- array) and the second should be the maximum amount of live entities for the component (size of the dense array).
-boxedSparseSet :: Word32 -> Word32 -> IO (BoxedSparseSet a)
-boxedSparseSet global component = BoxedSparseSet <$> SB.create global component
+boxedSparseSet' ::
+  forall component m i.
+  (MonadIO m, Component component, Store component ~ BoxedSparseSet) =>
+  SparseSetSize ->
+  System m i i
+boxedSparseSet' (SparseSetSize dense) =
+  withSetup
+    (\w -> let i = (w ^. #maxEntities ^. coerced) in BoxedSparseSet <$> SB.create @component i dense)
+    addStore
 
-instance ComponentMakeStore a BoxedSparseSet where
-  componentMakeStore (MaxEntities global) = boxedSparseSet global global
+-- | Creates a boxed sparse set with the default size. If the component is not used by many entities, consider
+-- decreasing the size.
+boxedSparseSet ::
+  forall component m i.
+  (MonadIO m, Component component, Store component ~ BoxedSparseSet) =>
+  System m i i
+boxedSparseSet =
+  withSetup
+    (\w -> let i = (w ^. #maxEntities ^. coerced) in BoxedSparseSet <$> SB.create @component i i)
+    addStore
+
+instance (Store component ~ BoxedSparseSet) => AutomaticStoreCreation component BoxedSparseSet where
+  createStoreAutomatically' = Just (\(MaxEntities i) -> BoxedSparseSet <$> SB.create @component i i)
+
+instance (Storable component, Store component ~ StorableSparseSet) => AutomaticStoreCreation component StorableSparseSet where
+  createStoreAutomatically' = Just (\(MaxEntities i) -> StorableSparseSet <$> SV.create @component i i)
+
+instance (Unbox component, Store component ~ UnboxedSparseSet) => AutomaticStoreCreation component UnboxedSparseSet where
+  createStoreAutomatically' = Just (\(MaxEntities i) -> UnboxedSparseSet <$> SU.create @component i i)

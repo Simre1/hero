@@ -1,3 +1,5 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module Main where
 
   
@@ -14,20 +16,17 @@ main :: IO ()
 main = do
   world <- createWorld 1000
 
-  runStartup <- compileSystem startup world
-  runStartup ()
-
   run <- compileSystem system world
   forever $ do
     run ()
 
-startup :: System IO () ()
-startup = for_ [1..5] $ \i -> 
-  pure (Position2D (i * 100) 100, rect) >>> newEntity
 
 system :: System IO () ()
-system = runGraphics defaultGraphics $ 
+system = withBasicComponents $ runGraphics defaultGraphics $ do
+    once $ for_ [1..5] $ \i -> 
+      pure (Position2D (i * 100) 100, rect) >>> newEntity
     cmap (\(Position2D x y) -> Position2D (x+1) (y+1))
+    pure ()
 
 rect :: Render
 rect = Render {

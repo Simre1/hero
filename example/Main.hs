@@ -7,14 +7,11 @@ data Position = Position Int Int
 
 data Velocity = Velocity Int Int
 
-data Acceleration = Acceleration Int Int
-
 instance Component Position where
   type Store Position = BoxedSparseSet
 
 instance Component Velocity where
   type Store Velocity = BoxedSparseSet
-
 
 main :: IO ()
 main = do
@@ -23,7 +20,8 @@ main = do
   runSystem ()
 
 system :: System IO () ()
-system = 
+system =
+  
   -- Create two entities
   (pure (Position 0 0, Velocity 1 0) >>> newEntity) *>
   (pure (Position 10 0, Velocity 0 1) >>> newEntity) *>

@@ -1,15 +1,26 @@
-module Hero.Entity (Entity(..), MaxEntities(..), global, Entities, newEntities, entitiesNew, entitiesDelete, entitiesFor, entitiesAmount) where
+module Hero.Entity
+  ( Entity (..),
+    MaxEntities (..),
+    global,
+    Entities,
+    newEntities,
+    entitiesNew,
+    entitiesDelete,
+    entitiesFor,
+    entitiesAmount,
+  )
+where
 
+import Control.Monad.IO.Class (MonadIO)
 import Data.Coerce (coerce)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
-import Hero.SparseSet.NoComponent qualified as S
 import Data.Vector.Unboxed.Mutable qualified as VU
 import Data.Word (Word32)
-import Control.Monad.IO.Class (MonadIO)
+import Hero.SparseSet.NoComponent qualified as S
 
 -- An entity is an object within a world with components. 'Entity' can be used to access the components of a world.
 -- Working the the underlying 'World32' is probably not a good idea.
-newtype Entity = Entity Word32 deriving Show
+newtype Entity = Entity Word32 deriving (Show)
 
 -- | MaxEntities should be the maximum amount of live entities within a world. Lower max entity count
 -- saves memory.

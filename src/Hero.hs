@@ -13,24 +13,27 @@ module Hero
 
     -- * Component
     Component (..),
+
     -- ** Premade components
-    Position2D(..),
+    Position2D (..),
+
     -- ** Store
-    MakeStore (..),
     StorableSparseSet,
     storableSparseSet,
+    storableSparseSet',
     UnboxedSparseSet,
     unboxedSparseSet,
+    unboxedSparseSet',
     BoxedSparseSet,
     boxedSparseSet,
+    boxedSparseSet',
     Global,
-    makeGlobal,
     getGlobal,
     putGlobal,
+    addGlobal,
 
     -- * System
     System,
-    compileSystem,
     cmap,
     cmap',
     cmapM,
@@ -41,10 +44,15 @@ module Hero
     cfoldM',
     cfoldl,
     cfoldr,
+    once,
+    forward,
+    sdelete,
+    sput,
     newEntity,
     deleteEntity,
     liftSystem,
     withSetup,
+    compileSystem,
 
     -- * Query
     Query,
@@ -73,4 +81,5 @@ import Hero.Component.Store.Global
 import Hero.Component.Store.SparseSet
 import Hero.Entity hiding (newEntity)
 import Hero.System
+import Hero.System.ComponentFunctions
 import Hero.World

@@ -3,27 +3,18 @@
 module Hero.World
   ( World (..),
     createWorld,
-    worldComponentId,
-    worldComponent,
-    worldNewEntity,
-    worldAddComponent
+    getComponentId,
+    getStore,
+    createEntity,
+    addStore,
   )
 where
 
 import Data.Kind (Type)
 import Data.Word (Word32)
-import Hero.Component
-  ( Component,
-    ComponentId,
-    ComponentMakeStore,
-    Store,
-    Store',
-    Stores,
-    addStore,
-    getComponentId,
-    getStore,
-    newStores,
-  )
+import GHC.Generics ( Generic )
+import Hero.Component.Component ( Store', Component, ComponentId )
+import Hero.Component.Store.AllStores qualified as AllStores
 import Hero.Entity
   ( Entities,
     Entity,
@@ -31,36 +22,37 @@ import Hero.Entity
     entitiesNew,
     newEntities,
   )
+import Optics.Core ((^.))
 
 -- | A world holds all entities and their components.
 data World = World
-  { worldStores :: !Stores,
-    worldEntities :: !Entities,
-    worldMaxEntities :: !MaxEntities
+  { allStores :: !AllStores.AllStores,
+    entities :: !Entities,
+    maxEntities :: !MaxEntities
   }
+  deriving (Generic)
+
+getComponentId :: forall (component :: Type). Component component => World -> IO ComponentId
+getComponentId !w = AllStores.getComponentId @component (w ^. #allStores) (w ^. #maxEntities)
+{-# INLINE getComponentId #-}
+
+getStore :: forall component. Component component => World -> IO (Store' component)
+getStore !w = AllStores.getComponentId @component (w ^. #allStores) (w ^. #maxEntities) >>= AllStores.getStore (w ^. #allStores)
+{-# INLINE getStore #-}
+
+addStore :: forall component. Component component => World -> Store' component -> IO ComponentId
+addStore !w s = AllStores.addStore (w ^. #allStores) s
+{-# INLINE addStore #-}
+
+createEntity :: World -> IO Entity
+createEntity !world = entitiesNew (world ^. #maxEntities) (world ^. #entities)
+{-# INLINE createEntity #-}
 
 -- | Create a new world which can hold as many entities as were specified in the input parameter.
 --   Keep in mind that a greater maximum results in greater memory usage.
 createWorld :: Word32 -> IO World
 createWorld !max = do
   let maxEnts = MaxEntities max
-  !stores <- newStores
+  !allStores <- AllStores.createStores
   !entities <- newEntities maxEnts
-  pure $ World stores entities maxEnts
-
-worldComponentId :: forall (component :: Type). Component component => World -> IO ComponentId
-worldComponentId !w = getComponentId @component (worldStores w) (worldMaxEntities w)
-{-# INLINE worldComponentId #-}
-
-worldComponent :: forall component. Component component => World -> IO (Store' component)
-worldComponent !w = getComponentId @component (worldStores w) (worldMaxEntities w) >>= getStore (worldStores w)
-{-# INLINE worldComponent #-}
-
-worldAddComponent :: forall component. Component component => World -> Store' component -> IO ComponentId
-worldAddComponent !w s = addStore (worldStores w) s
-{-# INLINE worldAddComponent #-}
-
-worldNewEntity :: World -> IO Entity
-worldNewEntity !world = entitiesNew (worldMaxEntities world) (worldEntities world)
-{-# INLINE worldNewEntity #-}
-
+  pure $ World allStores entities maxEnts
