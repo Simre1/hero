@@ -35,11 +35,21 @@ library
         containers,
         vector,
         text,
-        linear
+        linear,
+        optics-core
     hs-source-dirs:   src
     default-language: GHC2021
+    default-extensions:
+        DuplicateRecordFields
+        NoFieldSelectors
+        OverloadedLabels
 
 executable example
     main-is: Main.hs
     hs-source-dirs: example
-    build-depends: base ^>=4.16.0.0, hero, hero-sdl2, linear
+    build-depends: base ^>=4.16.0.0, hero, hero-sdl2, linear, optics-core
+    default-language: GHC2021
+    default-extensions:
+        DuplicateRecordFields
+        NoFieldSelectors
+        OverloadedLabels

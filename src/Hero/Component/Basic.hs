@@ -1,4 +1,4 @@
-module Hero.Component.Basic (Position2D (..)) where
+module Hero.Component.Basic where
 
 import Control.Arrow ((>>>))
 import Control.Monad.IO.Class (MonadIO (liftIO))
@@ -21,13 +21,14 @@ instance Storable Position2D where
   peek ptr = do
     let floatPtr = castPtr ptr
     Position2D <$> peek floatPtr <*> peek (floatPtr `plusPtr` floatSize)
+    where
+      floatSize = sizeOf (undefined :: Float)
   poke ptr (Position2D x y) = do
     let floatPtr = castPtr ptr
     poke floatPtr x
     poke (floatPtr `plusPtr` floatSize) y
-
-floatSize :: Int
-floatSize = sizeOf (undefined :: Float)
+    where
+      floatSize = sizeOf (undefined :: Float)
 
 instance Component Position2D where
   type Store Position2D = StorableSparseSet
@@ -46,6 +47,7 @@ newtype TimeDelta = TimeDelta Double
 instance Component TimeDelta where
   type Store TimeDelta = Global
 
+-- | Sets up a `TimeDelta` and updates it.
 timeDelta :: MonadIO m => System m i i
 timeDelta =
   forward $
@@ -59,26 +61,26 @@ timeDelta =
         )
       >>> putGlobal @TimeDelta
 
-
 -- | Global component which has the delta time
 newtype Timer = Timer Double
 
-instance Component TimeDelta where
-  type Store TimeDelta = Global
+instance Component Timer where
+  type Store Timer = Global
 
-timeDelta :: MonadIO m => System m i i
-timeDelta =
+-- | Sets up a `Timer` and updates it.
+timer :: MonadIO m => System m i i
+timer =
   forward $
-    addGlobal (TimeDelta 0)
+    addGlobal (Timer 0)
       >>> withSetup
-        (\_ -> newIORef 1e1000)
+        (\_ -> getMonotonicTime >>= newIORef)
         ( \ref -> liftSystem $ \_ -> liftIO $ do
+            startTime <- readIORef ref
             currentTime <- getMonotonicTime
-            delta <- atomicModifyIORef' ref (\lastTime -> (currentTime, currentTime - lastTime))
-            pure $ TimeDelta (max 0 $ realToFrac delta)
+            pure $ Timer (currentTime - startTime)
         )
-      >>> putGlobal @TimeDelta
+      >>> putGlobal @Timer
 
-
-withBasicComponents :: MonadIO m => System m i o -> System m i o
-withBasicComponents system = storableSparseSet @Position2D >>> timeDelta >>> system
+-- | Sets up a `Timer` and `TimeDelta` and updates them.
+timingComponents :: MonadIO m => System m i i
+timingComponents = timeDelta >>> timer

@@ -37,9 +37,9 @@ instance ComponentPut a Global where
   {-# INLINE componentPut #-}
 
 getGlobal ::
-  forall component m.
+  forall component m i.
   (MonadIO m, Component component, Store component ~ Global) =>
-  System m () component
+  System m i component
 getGlobal =
   withSetup' (World.getStore @component)
     >>> liftSystem (\(Global ref) -> liftIO $ readIORef ref)

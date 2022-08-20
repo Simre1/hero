@@ -16,6 +16,11 @@ module Hero
 
     -- ** Premade components
     Position2D (..),
+    Timer(..),
+    timer,
+    TimeDelta(..),
+    timeDelta,
+    timingComponents,
 
     -- ** Store
     StorableSparseSet,
@@ -52,6 +57,7 @@ module Hero
     deleteEntity,
     liftSystem,
     withSetup,
+    withSetup',
     compileSystem,
 
     -- * Query
