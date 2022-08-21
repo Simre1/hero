@@ -39,5 +39,5 @@ rect =
   Render
     { rotation = 0,
       offset = V2 0 0,
-      image = Shape (Rectangle 50) (Fill (Just (V4 100 0 0 255)) (Just (V4 255 255 255 255)))
+      sprite = Shape (SRectangle 50) (Fill (Just (V4 100 0 0 255)) (Just (V4 255 255 255 255)))
     }

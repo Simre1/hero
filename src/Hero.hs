@@ -75,6 +75,9 @@ module Hero
     QCD,
     QCI,
 
+    -- * Geometry
+    Rectangle(..),
+
     -- * Re-Exports
     Arrow (..),
     (>>>),
@@ -90,3 +93,4 @@ import Hero.Entity hiding (newEntity)
 import Hero.System
 import Hero.System.ComponentFunctions
 import Hero.World
+import Hero.Geometry

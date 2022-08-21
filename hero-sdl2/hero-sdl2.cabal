@@ -32,6 +32,7 @@ library
         base ^>=4.16.0.0,
         sdl2,
         sdl2-gfx,
+        sdl2-image,
         hero,
         containers,
         vector,
@@ -45,9 +46,19 @@ library
         NoFieldSelectors
         OverloadedLabels
 
-executable example
+executable rotating-shapes
     main-is: Main.hs
-    hs-source-dirs: example
+    hs-source-dirs: examples/rotating-shapes
+    build-depends: base ^>=4.16.0.0, hero, hero-sdl2, linear, optics-core
+    default-language: GHC2021
+    default-extensions:
+        DuplicateRecordFields
+        NoFieldSelectors
+        OverloadedLabels
+
+executable image-rendering
+    main-is: Main.hs
+    hs-source-dirs: examples/image-rendering
     build-depends: base ^>=4.16.0.0, hero, hero-sdl2, linear, optics-core
     default-language: GHC2021
     default-extensions:

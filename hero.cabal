@@ -29,7 +29,8 @@ library
         containers,
         data-default,
         constraints,
-        optics-core
+        optics-core,
+        linear
     hs-source-dirs:   src
     exposed-modules:
         Hero,
@@ -54,8 +55,9 @@ library
 
         Hero.System,
         Hero.System.System,
-        Hero.System.ComponentFunctions
+        Hero.System.ComponentFunctions,
 
+        Hero.Geometry
 
 
     default-language: GHC2021
