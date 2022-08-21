@@ -31,6 +31,7 @@ library
     build-depends:    
         base ^>=4.16.0.0,
         sdl2,
+        sdl2-gfx,
         hero,
         containers,
         vector,

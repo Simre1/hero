@@ -16,6 +16,7 @@ module Hero
 
     -- ** Premade components
     Position2D (..),
+    Rotation2D(..),
     Timer(..),
     timer,
     TimeDelta(..),

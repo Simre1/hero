@@ -24,14 +24,20 @@ system =
       once $
         for_ [-1, 0, 1] $ \i ->
           pure (Position2D (i * 150) 0, rect) >>> newEntity
-      getGlobal @Timer >>> cmap' (\(Timer t) (render :: Render) -> render & #offset .~ (V2 (realToFrac $ 100 * cos (t * pi)) (realToFrac $ 100 * sin (t * pi))))
+      getGlobal @Timer
+        >>> cmap'
+          ( \(Timer t) (render :: Render) ->
+              let t' = realToFrac t in
+              render
+                & #offset .~ (V2 (100 * cos (t' * pi)) (100 * sin (t' * pi)))
+                & #rotation .~ (t' * pi)
+          )
       pure ()
 
 rect :: Render
 rect =
   Render
-    { rotation = Rotation,
-      size = V2 50 50,
+    { rotation = 0,
       offset = V2 0 0,
-      image = Shape Rectangle (Fill $ Just (V4 100 0 0 255))
+      image = Shape (Rectangle 50) (Fill (Just (V4 100 0 0 255)) (Just (V4 255 255 255 255)))
     }
