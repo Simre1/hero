@@ -28,18 +28,19 @@ system =
       getGlobal @Timer
         >>> cmap'
           ( \(Timer t) (render :: Render) ->
-              render
-                & #sprite
-                  % #_Texture
-                  % _1
-                    .~ ((* realToFrac (1.5 + 0.5 * (sin t))) <$> V2 800 600)
+              let render' = render
+                        & #sprite
+                          % #_Texture
+                          % #size
+                            .~ ((* realToFrac (1.5 + 0.5 * (sin t))) <$> V2 800 600)
+              in (Rotation2D (realToFrac t), render')
           )
       pure ()
 
 sprite :: Texture -> Render
 sprite texture =
   render & #sprite
-    .~ ( Texture
+    .~ ( Texture $ TextureSprite
            { size = V2 0 0,
              source = Nothing,
              texture

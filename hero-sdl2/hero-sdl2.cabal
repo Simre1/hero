@@ -66,3 +66,13 @@ executable image-rendering
         DuplicateRecordFields
         NoFieldSelectors
         OverloadedLabels
+
+executable move-shape
+    main-is: Main.hs
+    hs-source-dirs: examples/move-shape
+    build-depends: base ^>=4.16.0.0, hero, hero-sdl2, linear, optics-core
+    default-language: GHC2021
+    default-extensions:
+        DuplicateRecordFields
+        NoFieldSelectors
+        OverloadedLabels

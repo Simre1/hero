@@ -48,7 +48,7 @@ instance Component Rotation2D where
   type Store Rotation2D = StorableSparseSet
 
 -- | Global component which has the delta time
-newtype TimeDelta = TimeDelta Double
+newtype TimeDelta = TimeDelta Float
 
 instance Component TimeDelta where
   type Store TimeDelta = Global
@@ -63,12 +63,12 @@ timeDelta =
         ( \ref -> liftSystem $ \_ -> liftIO $ do
             currentTime <- getMonotonicTime
             delta <- atomicModifyIORef' ref (\lastTime -> (currentTime, currentTime - lastTime))
-            pure $ TimeDelta (max 0 delta)
+            pure $ TimeDelta (max 0 $ realToFrac delta)
         )
       >>> putGlobal @TimeDelta
 
 -- | Global component which has the delta time
-newtype Timer = Timer Double
+newtype Timer = Timer Float
 
 instance Component Timer where
   type Store Timer = Global
@@ -83,7 +83,7 @@ timer =
         ( \ref -> liftSystem $ \_ -> liftIO $ do
             startTime <- readIORef ref
             currentTime <- getMonotonicTime
-            pure $ Timer (currentTime - startTime)
+            pure $ Timer (realToFrac $ currentTime - startTime)
         )
       >>> putGlobal @Timer
 

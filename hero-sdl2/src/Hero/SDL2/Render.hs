@@ -9,10 +9,13 @@ module Hero.SDL2.Render
     Render (..),
     render,
     Sprite (..),
+    TextureSprite(..),
     SDL.Texture,
     loadTexture,
     Shape (..),
     Fill (..),
+    fillBorder,
+    fillColor,
     Camera (..),
     defaultCamera,
   )
@@ -76,10 +79,17 @@ render = Render 0 (V2 0 0) (Shape (SCircle 25) $ Fill (Just $ V4 100 140 200 255
 
 -- | Fill colors used to draw shapes
 data Fill = Fill
-  { fill :: {-# UNPACK #-} !(Maybe (V4 Word8)),
+  { color :: {-# UNPACK #-} !(Maybe (V4 Word8)),
     border :: {-# UNPACK #-} !(Maybe (V4 Word8))
   }
   deriving (Generic)
+
+
+fillColor :: V4 Word8 -> Fill
+fillColor c = Fill {color = Just c, border = Nothing}
+
+fillBorder :: V4 Word8 -> Fill
+fillBorder c = Fill {color = Nothing, border = Just c}
 
 -- | The supported shapes
 data Shape
@@ -90,7 +100,15 @@ data Shape
 -- A sprite can either be a shape or a texture
 data Sprite
   = Shape {shape :: Shape, fill :: Fill}
-  | Texture {size :: V2 Float, source :: Maybe (Rectangle Float), texture :: SDL.Texture}
+  | Texture TextureSprite
+  deriving (Generic)
+
+-- A texture sprite defines a section of the texture which will be rendered
+data TextureSprite = TextureSprite
+  { size :: V2 Float,
+    source :: Maybe (Rectangle Float),
+    texture :: SDL.Texture
+  }
   deriving (Generic)
 
 instance Component Render where
@@ -177,14 +195,14 @@ renderEntities (Graphics renderer window, scale, adjustPosition) (maybePosition,
       windowPosition = adjustPosition worldPosition
       rotationRadian = fromMaybe 0 (coerce maybeRotation) + render ^. #rotation
   case render ^. #sprite of
-    Texture size source texture -> do
+    Texture (TextureSprite size source texture) -> do
       let scaledSize@(V2 sX sY) = size * scale
           sourceRect = (\(Rectangle pos src) -> round <$> SDL.Rectangle (SDL.P pos) src) <$> source
           destRect = round <$> SDL.Rectangle (SDL.P $ windowPosition - 0.5 * scaledSize) scaledSize
           rotationDegrees = realToFrac $ rotationRadian * (180 / pi)
       SDL.copyEx renderer texture sourceRect (Just destRect) rotationDegrees Nothing (V2 False False)
     Shape shape fill -> do
-      let fillColor = fill ^. #fill
+      let fillColor = fill ^. #color
           borderColor = fill ^. #border
       case shape of
         SRectangle size ->
