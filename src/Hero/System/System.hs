@@ -10,8 +10,8 @@ import Control.Category (Category (..))
 import Control.Monad.IO.Class (MonadIO (..))
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Kind (Type)
+import Hero.World (World)
 import Prelude hiding (id, (.))
-import Hero.World ( World )
 
 -- | A system is a function which can operate on the components of a world.
 -- Keep in mind that system has Functor, Applicative, Category and Arrow instances, but no Monad instance.
@@ -94,3 +94,15 @@ once (System makeS) = System $ \w -> do
   writeIORef ref $ \i -> s i >>= \o -> liftIO (writeIORef ref (\_ -> pure o)) >> pure o
   pure $ \i -> liftIO (readIORef ref) >>= \f -> f i
 {-# INLINE once #-}
+
+-- | Feed back the output value as input in in the next iteration.
+feedback :: MonadIO m => s -> System m (i, s) (o, s) -> System m i o
+feedback s (System makeS) = System $ \w -> do
+  runS <- makeS w
+  ref <- liftIO $ newIORef s
+  pure $ \i -> do
+    s' <- liftIO $ readIORef ref
+    (o, s'') <- runS (i, s')
+    liftIO $ writeIORef ref s''
+    pure o
+{-# INLINE feedback #-}
