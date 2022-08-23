@@ -16,10 +16,10 @@ module Hero
 
     -- ** Premade components
     Position2D (..),
-    Rotation2D(..),
-    Timer(..),
+    Rotation2D (..),
+    Timer (..),
     addTimer,
-    TimeDelta(..),
+    TimeDelta (..),
     addTimeDelta,
     addTimingComponents,
 
@@ -40,6 +40,7 @@ module Hero
 
     -- * System
     System,
+    liftSystem,
     cmap_,
     cmap,
     cmapM_,
@@ -57,9 +58,10 @@ module Hero
     sput,
     createEntity,
     deleteEntity,
-    liftSystem,
     withSetup,
     withSetup',
+    ifS,
+    ifEnum,
     compileSystem,
 
     -- * Query
@@ -77,7 +79,7 @@ module Hero
     QCI,
 
     -- * Geometry
-    Rectangle(..),
+    Rectangle (..),
 
     -- * Re-Exports
     Arrow (..),
@@ -91,7 +93,7 @@ import Hero.Component.Basic
 import Hero.Component.Store.Global
 import Hero.Component.Store.SparseSet
 import Hero.Entity hiding (newEntity)
+import Hero.Geometry
 import Hero.System
 import Hero.System.ComponentFunctions
 import Hero.World hiding (createEntity)
-import Hero.Geometry

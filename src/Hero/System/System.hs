@@ -12,6 +12,8 @@ import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Kind (Type)
 import Hero.World (World)
 import Prelude hiding (id, (.))
+import qualified Data.Vector as V
+import Data.Coerce (coerce)
 
 -- | A system is a function which can operate on the components of a world.
 -- Keep in mind that system has Functor, Applicative, Category and Arrow instances, but no Monad instance.
@@ -106,3 +108,30 @@ feedback s (System makeS) = System $ \w -> do
     liftIO $ writeIORef ref s''
     pure o
 {-# INLINE feedback #-}
+
+-- | Depending on the output of the last system, runs one or the other system, similar to the bool function.
+-- If output == False, then the first system is run (false -> left).
+-- If output == True, then the second system is run (true -> right).
+-- Compiles all three systems.
+ifS :: MonadIO m => System m i o -> System m i o -> System m i Bool -> System m i o
+ifS (System makeS1) (System makeS2) (System makeSD) = System $ \w -> do
+  sd <- makeSD w
+  s1 <- makeS1 w
+  s2 <- makeS2 w
+  pure $ \i -> do
+    whichSystem <- sd i
+    if whichSystem
+      then s2 i
+      else s1 i
+  
+-- | Depending on the output of the last system, runs the system created by the given function.
+-- Runs the system which the function matches to the `enum`.
+-- Compiles systems for all `Enum` values. Do not use this for large `Enum`s!!
+ifEnum :: (Enum enum, MonadIO m) => (enum -> System m i o) -> System m i enum -> System m i o
+ifEnum makeSystem (System makeSD) = System $ \w -> do
+  sd <- makeSD w
+  compiledSystems <- fmap V.fromList $ sequenceA $ (($ w) . coerce . makeSystem) <$> enums
+  pure $ \i -> do
+    whichSystem <- sd i
+    (compiledSystems V.! (fromEnum whichSystem)) i
+  where enums = enumFrom (toEnum 0)
