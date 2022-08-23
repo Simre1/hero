@@ -9,23 +9,24 @@ module Hero.SparseSet.Boxed
     remove,
     for,
     visualize,
-    growDense
+    growDense,
   )
 where
 
-import Control.Monad (forM_ )
-import Control.Monad.IO.Class ( MonadIO(..) )
+import Control.Monad (forM_)
+import Control.Monad.IO.Class (MonadIO (..))
 import Data.IORef
-    ( IORef,
-      atomicModifyIORef,
-      atomicModifyIORef',
-      newIORef,
-      readIORef )
-import Data.Vector.Primitive qualified as VP
-import Data.Vector.Primitive.Mutable qualified as VPM
+  ( IORef,
+    atomicModifyIORef,
+    atomicModifyIORef',
+    newIORef,
+    readIORef,
+  )
 import Data.Vector qualified as V
 import Data.Vector.Mutable qualified as VM
-import Data.Word ( Word32 )
+import Data.Vector.Primitive qualified as VP
+import Data.Vector.Primitive.Mutable qualified as VPM
+import Data.Word (Word32)
 import Prelude hiding (lookup)
 
 data SparseSetBoxed a = SparseSetBoxed
@@ -87,7 +88,7 @@ remove (SparseSetBoxed sparse entities dense sizeRef) i = do
   if index == maxBound
     then pure ()
     else do
-      lastDenseIndex <- atomicModifyIORef sizeRef $ \size -> (pred size, pred size)
+      lastDenseIndex <- atomicModifyIORef sizeRef $ \size -> let s = max 0 (pred size) in (s, s)
 
       lastElement <- VM.unsafeRead dense lastDenseIndex
       lastKey <- VPM.unsafeRead entities lastDenseIndex

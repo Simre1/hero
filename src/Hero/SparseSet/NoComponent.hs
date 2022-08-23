@@ -60,7 +60,7 @@ remove (SparseSetNoComponent sparse entities sizeRef) i = do
   if index == maxBound
     then pure ()
     else do
-      lastDenseIndex <- atomicModifyIORef sizeRef $ \size -> (pred size, pred size)
+      lastDenseIndex <- atomicModifyIORef sizeRef $ \size -> let s = max 0 (pred size) in (s,s)
 
       lastKey <- VPM.unsafeRead entities lastDenseIndex
 
