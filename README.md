@@ -18,7 +18,8 @@ In order to use `Position` as a component, you need to make it an instance of `C
 
 ```haskell
 instance Component Position where
-  type Store Position = BoxedSparseSet -- StorableSparseSet is faster but Position would need to implement Storable
+  type Store Position = BoxedSparseSet 
+  -- StorableSparseSet is faster but Position would need to implement Storable
 ```
 
 ## Systems
@@ -26,17 +27,16 @@ instance Component Position where
 Systems are functions which operate on the components of a world. For example, you can map the `Position` component of every entity:
 
 ```haskell
-cmap $ \(Position x y) -> Position (x + 1) y
+cmap_ $ \(Position x y) -> Position (x + 1) y
 ```
 
-`System` has the type `system :: System m input output`. `System`s can be chained together through its `Applicative`, `Category` and `Arrow` instance. However, `System`s are not an instance of `Monad`!
+`System`s have the type `system :: System m input output`. `System`s can be chained together through its `Applicative`, `Category` and `Arrow` instance. However, `System`s dot have an instance for `Monad`!
 
-After constructing a `System`, you need to compile it with `compileSystem :: System m input output -> World -> IO (input -> m output)`.
+`System`s have a compilation phase and a run phase. Before you can run a `System`, you need to compile it with `compileSystem :: System m input output -> World -> IO (input -> m output)`.
 
 ## Example
 
 ```haskell
-import Control.Monad ( forM_ )
 import Hero
 import Data.Foldable (for_)
 
@@ -67,14 +67,14 @@ main = do
 system :: System IO () ()
 system =
   -- Create two entities
-  (pure (Position 0 0, Velocity 1 0) >>> newEntity) *>
-  (pure (Position 10 0, Velocity 0 1) >>> newEntity) *>
+  (pure (Position 0 0, Velocity 1 0) >>> createEntity) *>
+  (pure (Position 10 0, Velocity 0 1) >>> createEntity) *>
 
   -- Map position 10 times
-  for_ [1..10] (\_ -> cmap (\(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy))) *>
+  for_ [1..10] (\_ -> cmap_ (\(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy))) *>
 
   -- Print the current position
-  cmapM (\(Position x y) -> print (x,y))
+  cmapM_ (\(Position x y) -> print (x,y))
 ```
 
 ## Installation
@@ -104,6 +104,20 @@ cabal run hero-bench
 cabal run apecs-bench
 ```
 
+### Hero SDL2
+
+The folder hero-sdl2 contains a small libary to use SDL2 with Hero. It needs the C libraries `SDL2`, `SDL2_gdx` and `SDL2_image`.
+
+The Hero SDL2 examples can be run with:
+
+```
+cabal run rotating-shapes
+cabal run image-rendering
+cabal run move-shape
+```
+
+More information can be found in [`hero-sdl2`](hero-sdl2/README.md).
+
 ### Cabal dependency
 
 To use _Hero_ as a dependency, add `hero` to the `build-depends` section. Additional, create a `cabal.project` with: 
@@ -115,6 +129,20 @@ source-repository-package
    location: https://github.com/Simre1/hero
 ```
 
+If you also want to use `hero-sdl2`, add `hero-sdl2` to the `build-depends` section as well. The `cabal.project` is then:
+```
+packages: *.cabal
+
+source-repository-package
+   type: git
+   location: https://github.com/Simre1/hero
+
+source-repository-package
+   type: git
+   location: https://github.com/Simre1/hero
+   subdir: hero-sdl2
+```
+
 ## Benchmark
 
 A basic benchmark seems to suggest that `Hero` is much faster. However, it relies heavily on
@@ -123,8 +151,8 @@ functions which deal with polymorphic systems.
 
 The following queries are used to test the iteration speed of both libraries:
 ```
-cmap (\(Velocity vx vy, Acceleration ax ay) -> Velocity (vx + ax) (vy + ay)) *>
-cmap (\(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy))
+cmap_ (\(Velocity vx vy, Acceleration ax ay) -> Velocity (vx + ax) (vy + ay)) *>
+cmap_ (\(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy))
 ```
 
 ### Hero

@@ -18,10 +18,10 @@ module Hero
     Position2D (..),
     Rotation2D(..),
     Timer(..),
-    timer,
+    addTimer,
     TimeDelta(..),
-    timeDelta,
-    timingComponents,
+    addTimeDelta,
+    addTimingComponents,
 
     -- ** Store
     StorableSparseSet,
@@ -40,14 +40,14 @@ module Hero
 
     -- * System
     System,
+    cmap_,
     cmap,
-    cmap',
+    cmapM_,
     cmapM,
-    cmapM',
+    cfold_,
     cfold,
-    cfold',
+    cfoldM_,
     cfoldM,
-    cfoldM',
     cfoldl,
     cfoldr,
     once,
@@ -55,7 +55,7 @@ module Hero
     feedback,
     sdelete,
     sput,
-    newEntity,
+    createEntity,
     deleteEntity,
     liftSystem,
     withSetup,
@@ -93,5 +93,5 @@ import Hero.Component.Store.SparseSet
 import Hero.Entity hiding (newEntity)
 import Hero.System
 import Hero.System.ComponentFunctions
-import Hero.World
+import Hero.World hiding (createEntity)
 import Hero.Geometry

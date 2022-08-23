@@ -44,14 +44,14 @@ main = do
 initEntities :: System IO () ()
 initEntities = for_
       [0 .. 1000]
-      ( \i -> pure (Position 0 i, Velocity 0 0, Acceleration 1 0) >>> newEntity
+      ( \i -> pure (Position 0 i, Velocity 0 0, Acceleration 1 0) >>> createEntity
       )
 
 physics :: System IO () ()
 physics = do
   for_ [1 .. 20] $ \_ -> do
-    cmap $ \(Velocity vx vy, Acceleration ax ay) -> Velocity (vx + ax) (vy + ay)
-    cmap $ \(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy)
+    cmap_ $ \(Velocity vx vy, Acceleration ax ay) -> Velocity (vx + ax) (vy + ay)
+    cmap_ $ \(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy)
     pure ()
 
   pure ()

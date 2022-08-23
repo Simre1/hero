@@ -29,12 +29,14 @@ newtype MaxEntities = MaxEntities Word32
 -- | The data structure storing all entities.
 data Entities = Entities !S.SparseSetNoComponent !(IORef Word32)
 
+-- | Creates entities store needed for world creation
 newEntities :: MaxEntities -> IO Entities
 newEntities (MaxEntities max) = do
   set <- S.create max max
   lastId <- newIORef 0
   pure $ Entities set lastId
 
+-- | Creates a new entity
 entitiesNew :: MaxEntities -> Entities -> IO Entity
 entitiesNew (MaxEntities max) (Entities entities lastIdRef) = do
   lastId <- readIORef lastIdRef
@@ -51,19 +53,23 @@ entitiesNew (MaxEntities max) (Entities entities lastIdRef) = do
         else pure next
 {-# INLINE entitiesNew #-}
 
+
+-- | Deletes an entity from entities
 entitiesDelete :: Entities -> Entity -> IO ()
 entitiesDelete (Entities entities _) (Entity key) = S.remove entities key
 {-# INLINE entitiesDelete #-}
 
+-- | Iterate on all entities
 entitiesFor :: MonadIO m => Entities -> (Entity -> m ()) -> m ()
 entitiesFor (Entities entities _) f = S.for entities (coerce f)
 {-# INLINE entitiesFor #-}
 
+-- Total live entity amount
 entitiesAmount :: Entities -> IO Int
 entitiesAmount (Entities entities _) = S.size entities
 {-# INLINE entitiesAmount #-}
 
--- | 'global' is an entity which is not part of normal component store but can
+-- | 'global' is an entity which is not part of a normal component store but can
 -- be used to access global components like the 'Global' store.
 global :: Entity
 global = Entity maxBound

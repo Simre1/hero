@@ -276,22 +276,32 @@ import SDL.Init qualified as SDL
 import SDL.Input.Keyboard qualified as SDL
 import SDL.Input.Keyboard.Codes qualified as SDLCodes
 
+-- | Current snapshot of the keyboard state. Contains the keyboard state of the moment it was sampled and does NOT change.
+-- Use `KeyboardState` if you interested only in the current state of the keyboard. Do not use it if you want to know
+-- that a key was pressed. It might happen that the user presses a key very quickly between two frames so you might not catch it
+-- with `KeyboardState`.
 newtype KeyboardState = KeyboardState (SDLCodes.Scancode -> Bool)
 
+-- | Gets the current keyboard state. 
 getKeyboardState :: MonadIO m => System m i KeyboardState
 getKeyboardState = liftSystem (const $ KeyboardState <$> SDL.getKeyboardState)
 
+-- | Checks if a key was pressed at the moment `KeyboardState` was sampled.
 isPressed :: KeyboardState -> SDL.Scancode -> Bool
 isPressed (KeyboardState f) scancode = f scancode
 
+-- | Contains the SDL events which happened from the last frame to the current frame.
 newtype SDLEvents = SDLEvents {events :: [SDL.Event]} deriving (Generic)
 
 instance Component SDLEvents where
   type Store SDLEvents = Global
 
+-- | A keyboard event which leaves out some information of the original SDL keyboard event
 data KeyboardEvent = KeyboardEvent
   {key :: SDLCodes.Scancode, motion :: SDL.InputMotion}
 
+
+-- | Gets all keyboard events which happened since the last time the SDL events were pulled.
 getKeyboardEvents :: MonadIO m => System m () [KeyboardEvent]
 getKeyboardEvents =
   getGlobal @SDLEvents
@@ -308,6 +318,8 @@ getKeyboardEvents =
           }
     filterKeyboardEvents _ = Nothing
 
+-- | Adds the `SDLEvents` store and updates it each frame. SDLEvents will contain the event that happened
+-- between the last frame and the current frame.
 addSDLEvents :: MonadIO m => System m () ()
 addSDLEvents =
   withSetup (\_ -> SDL.initialize [SDL.InitEvents]) (\_ -> pure ())

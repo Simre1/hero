@@ -39,7 +39,7 @@ import Hero
     Rotation2D (..),
     System,
     addGlobal,
-    cmapM',
+    cmapM,
     getGlobal,
     liftSystem,
     once,
@@ -156,6 +156,8 @@ defaultCamera =
       size = V2 800 600
     }
 
+-- | Initializes SDL2 graphics and runs the render functions after the given system.
+-- Use `runGraphics` to wrap your game logic systems to ensure that the render system runs after your game logic.
 runGraphics :: forall i o m. MonadIO m => GraphicsConfig -> System m i o -> System m i o
 runGraphics graphicsConfig system = setup >>> second system >>> first graphics >>> arr snd
   where
@@ -172,7 +174,7 @@ runGraphics graphicsConfig system = setup >>> second system >>> first graphics >
 
                     pure (graphics, scale, adjustPosition camera windowSize)
                 )
-              >>> cmapM' renderEntities
+              >>> cmapM renderEntities
           present = liftSystem (\g@(Graphics renderer _) -> SDL.present renderer)
           clear = liftSystem (\g@(Graphics renderer _) -> SDL.rendererDrawColor renderer SDL.$= (V4 0 0 0 255) >> SDL.clear renderer *> pure g)
        in clear >>> id &&& render >>> arr fst >>> present
@@ -226,6 +228,8 @@ renderEntities (Graphics renderer window, scale, adjustPosition) (maybePosition,
           maybe (pure ()) (GFX.fillCircle renderer pos r) fillColor
           maybe (pure ()) (GFX.circle renderer pos r) borderColor
 
+-- | Loads a texture in the compilation step of a System and outputs it permanently. The Texture will stay alive for the whole
+-- program duration, so it is only suitable for small-scale applications.
 loadTexture :: MonadIO m => FilePath -> System m i SDL.Texture
 loadTexture filepath = getGlobal @Graphics >>> once (liftSystem $ \graphics -> Image.loadTexture (graphics ^. #renderer) filepath)
 {-# INLINE loadTexture #-}

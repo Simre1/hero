@@ -20,12 +20,12 @@ main = do
 system :: System IO () ()
 system =
   runGraphics defaultGraphics $
-    timingComponents >>> do
+    addTimingComponents >>> do
       once $
         for_ [-1, 0, 1] $ \i ->
-          pure (Position2D (i * 150) 0, rect) >>> newEntity
+          pure (Position2D (i * 150) 0, rect) >>> createEntity
       getGlobal @Timer
-        >>> cmap'
+        >>> cmap
           ( \(Timer t) (render :: Render) ->
               let t' = realToFrac t in
               render

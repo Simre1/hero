@@ -20,13 +20,13 @@ main = do
 system :: System IO () ()
 system =
   runGraphics defaultGraphics $
-    timingComponents >>> do
+    addTimingComponents >>> do
       loadTexture "image.jpg"
         >>> once
-          ( liftSystem (pure . sprite) >>> newEntity
+          ( liftSystem (pure . sprite) >>> createEntity
           )
       getGlobal @Timer
-        >>> cmap'
+        >>> cmap
           ( \(Timer t) (render :: Render) ->
               let render' = render
                         & #sprite

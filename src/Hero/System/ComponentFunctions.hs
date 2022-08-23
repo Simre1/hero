@@ -1,7 +1,49 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Hero.System.ComponentFunctions where
+module Hero.System.ComponentFunctions 
+  (
+-- * Component Functions
+-- Contains systems which operate on components of the world (Get/Put/Delete/Iterate components and entities).
+-- ** Iteration functions
+  cmap_,
+  cmap, 
+  cmapM_,
+  cmapM,
+  cfold_,
+  cfold,
+  cfoldM_,
+  cfoldM,
+  cfoldl,
+  cfoldr,
+-- ** Systems on a single entity
+  sput,
+  sdelete,
+  createEntity,
+  deleteEntity,
+-- ** Add Store
+  addStore,
+-- ** Query
+-- Queries might get removed or overhauled soon since they do not seem so useful. 
+  Query,
+  runQuery,
+  runQuery_,
+  singleQuery,
+  singleQuery_,
+  liftQuery,
+  qput,
+  qdelete,
+-- ** Machinery for operating on multiple components at once
+  QCG,
+  QueryGet(..),
+  QCP,
+  QueryPut(..),
+  QCD,
+  QueryDelete(..),
+  QCI,
+  QueryIterate(..),
+  S(..),
+  ) where
 
 import Control.Arrow (Arrow (arr, (***)))
 import Control.Category (Category (..))
@@ -30,23 +72,17 @@ import Hero.Component.Store.AllStores qualified as AllStores
 import Hero.Entity (Entity, entitiesAmount, entitiesDelete, entitiesFor)
 import Hero.System.System (System (..))
 import Hero.World qualified as World
-import Optics.Core
+import Optics.Core ( (<&>), (^.) )
 import Prelude hiding ((.))
 
--- | Low-level store setup used when implementing a custom `withStoreConfig`. Each store may only be set up once!
-addStore :: (Applicative m, Component component) => Store' component -> System m i i
-addStore store = System $ \w -> do
-  World.addStore w store
-  pure $ pure
-
 -- | Iterates over all entities with the requested components and sets the components calculated by the
--- given function
-cmap ::
+-- given function.
+cmap_ ::
   forall a b m i.
   (QCI a, QCP b, MonadIO m) =>
   (a -> b) ->
   System m i ()
-cmap f =
+cmap_ f =
   System
     ( \w -> do
         for <- queryFor @(S a) @a w
@@ -55,13 +91,14 @@ cmap f =
     )
 
 -- | Iterates over all entities with the requested components and sets the components calculated by the
--- given function
-cmap' ::
+-- given function.
+-- Has access to the system input.
+cmap ::
   forall a b i m.
   (QCI a, QCP b, MonadIO m) =>
   (i -> a -> b) ->
   System m i ()
-cmap' f =
+cmap f =
   System
     ( \w -> do
         for <- queryFor @(S a) @a w
@@ -71,8 +108,8 @@ cmap' f =
 
 -- | Iterates over all entities with the requested components and sets the components calculated by the
 -- given monadic function
-cmapM :: forall a b i m. (QCI a, QCP b, MonadIO m) => (a -> m b) -> System m i ()
-cmapM f =
+cmapM_ :: forall a b i m. (QCI a, QCP b, MonadIO m) => (a -> m b) -> System m i ()
+cmapM_ f =
   System
     ( \w -> do
         for <- queryFor @(S a) @a w
@@ -81,9 +118,10 @@ cmapM f =
     )
 
 -- | Iterates over all entities with the requested components and sets the components calculated by the
--- given monadic function
-cmapM' :: forall a b i m. (QCI a, QCP b, MonadIO m) => (i -> a -> m b) -> System m i ()
-cmapM' f =
+-- given monadic function.
+-- Has access to the system input.
+cmapM :: forall a b i m. (QCI a, QCP b, MonadIO m) => (i -> a -> m b) -> System m i ()
+cmapM f =
   System
     ( \w -> do
         for <- queryFor @(S a) @a w
@@ -92,8 +130,8 @@ cmapM' f =
     )
 
 -- | Iterates over all entities with the requested components and folds the components.
-cfold :: forall a o m i. (Monoid o, QCI a, MonadIO m) => (a -> o) -> System m i o
-cfold f = System $ \w -> do
+cfold_ :: forall a o m i. (Monoid o, QCI a, MonadIO m) => (a -> o) -> System m i o
+cfold_ f = System $ \w -> do
   for <- queryFor @(S a) @a w
   members <- queryMembers @(S a) @a w
   pure $! \i2 -> do
@@ -104,8 +142,9 @@ cfold f = System $ \w -> do
     liftIO $ readIORef ref
 
 -- | Iterates over all entities with the requested components and folds the components.
-cfold' :: forall a o m i. (Monoid o, QCI a, MonadIO m) => (i -> a -> o) -> System m i o
-cfold' f = System $ \w -> do
+-- Has access to the system input.
+cfold :: forall a o m i. (Monoid o, QCI a, MonadIO m) => (i -> a -> o) -> System m i o
+cfold f = System $ \w -> do
   for <- queryFor @(S a) @a w
   members <- queryMembers @(S a) @a w
   pure $! \i -> do
@@ -116,8 +155,8 @@ cfold' f = System $ \w -> do
     liftIO $ readIORef ref
 
 -- | Iterates over all entities with the requested components and monadically folds the components.
-cfoldM :: forall a o i m. (Monoid o, QCI a, MonadIO m) => (a -> m o) -> System m i o
-cfoldM f = System $ \w -> do
+cfoldM_ :: forall a o i m. (Monoid o, QCI a, MonadIO m) => (a -> m o) -> System m i o
+cfoldM_ f = System $ \w -> do
   for <- queryFor @(S a) @a w
   pure $! \i2 -> do
     ref <- liftIO $ newIORef (mempty :: o)
@@ -126,9 +165,10 @@ cfoldM f = System $ \w -> do
       liftIO $ modifyIORef ref (<> o)
     liftIO $ readIORef ref
 
--- | Iterates over all entities with the requested components and monadically folds the components.
-cfoldM' :: forall a o i m. (Monoid o, QCI a, MonadIO m) => (i -> a -> m o) -> System m i o
-cfoldM' f = System $ \w -> do
+-- | Iterates over all entities with the requested components and monadically folds the components. 
+-- Has access to the system input.
+cfoldM :: forall a o i m. (Monoid o, QCI a, MonadIO m) => (i -> a -> m o) -> System m i o
+cfoldM f = System $ \w -> do
   for <- queryFor @(S a) @a w
   pure $! \i -> do
     ref <- liftIO $ newIORef (mempty :: o)
@@ -172,14 +212,14 @@ sdelete = System $ \w -> do
 {-# INLINE sdelete #-}
 
 -- | Creates a new entity with the given components
-newEntity :: forall a m. (QCP a, MonadIO m) => System m a Entity
-newEntity = System $ \w -> do
+createEntity :: forall a m. (QCP a, MonadIO m) => System m a Entity
+createEntity = System $ \w -> do
   put <- queryPut @(S a) @a w
   pure $! \c -> do
     e <- liftIO $ World.createEntity w
     liftIO $ put e c
     pure e
-{-# INLINE newEntity #-}
+{-# INLINE createEntity #-}
 
 -- | Removes an entity and all its components
 deleteEntity :: forall a m. (MonadIO m) => System m Entity ()
@@ -190,6 +230,12 @@ deleteEntity = System $ \w -> do
     AllStores.eachStore stores $ \store -> componentEntityDelete store e
     entitiesDelete entities e
 {-# INLINE deleteEntity #-}
+
+-- | Add a store to the world. Each store may only be set up once! Mostly used in combination with `withSetup`.
+addStore :: (Applicative m, Component component) => Store' component -> System m i i
+addStore store = System $ \w -> do
+  World.addStore w store
+  pure $ pure
 
 -- | A Query is a function which can operate on the components of a world. In contrast to
 -- System, a query contains operations which operate on a single entity. System contains operations

@@ -22,12 +22,12 @@ main = do
 system :: System IO () ()
 system =
   runGraphics defaultGraphics $
-    addSDLEvents >>> timingComponents >>> do
+    addSDLEvents >>> addTimingComponents >>> do
       once
-        ( pure (Position2D 0 0, sprite) >>> newEntity
+        ( pure (Position2D 0 0, sprite) >>> createEntity
         )
       getGlobal @TimeDelta &&& getKeyboardState
-        >>> cmap'
+        >>> cmap
           ( \(TimeDelta dt, keyboardState) (Position2D x y) ->
               let keys = [ScancodeUp, ScancodeDown, ScancodeLeft, ScancodeRight]
                   directions = [V2 0 1, V2 0 (-1), V2 (-1) 0, V2 1 0]

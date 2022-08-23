@@ -41,9 +41,9 @@ ecs =
         init <- compileSystem (for_ [0 .. 999] (\_ -> pure (Position 0, Velocity 1) >>> newEntity)) w
         init ()
         let system =
-              cmap (\(Position x, Velocity v) -> Position (x + v))
-                *> cmap (\(Velocity v) -> Velocity (v + 1))
-                *> cfold (\(Position x) -> Sum x)
+              cmap_ (\(Position x, Velocity v) -> Position (x + v))
+                *> cmap_ (\(Velocity v) -> Velocity (v + 1))
+                *> cfold_ (\(Position x) -> Sum x)
         runSystem <- compileSystem system w
         result <- runSystem ()
         (== Sum 1000) result @? "Result is false"
@@ -55,8 +55,8 @@ ecs =
         entities <- init ()
         delete <- compileSystem deleteEntity w
         forM_ (take 4 entities) delete
-        countEntities <- compileSystem (cfold $ \(e :: Entity) -> Sum 1) w
-        countPositions <- compileSystem (cfold $ \(Position _) -> Sum 1) w
+        countEntities <- compileSystem (cfold_ $ \(e :: Entity) -> Sum 1) w
+        countPositions <- compileSystem (cfold_ $ \(Position _) -> Sum 1) w
 
         entitiesAmount <- countEntities ()
         positionAmount <- countPositions ()

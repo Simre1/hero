@@ -36,6 +36,8 @@ instance ComponentPut a Global where
   componentPut (Global ref) entity val = writeIORef ref val
   {-# INLINE componentPut #-}
 
+
+-- Gets the value of a global component store
 getGlobal ::
   forall component m i.
   (MonadIO m, Component component, Store component ~ Global) =>
@@ -44,6 +46,7 @@ getGlobal =
   withSetup' (World.getStore @component)
     >>> liftSystem (\(Global ref) -> liftIO $ readIORef ref)
 
+-- Puts the value into a global component store.
 putGlobal ::
   forall component m.
   (MonadIO m, Component component, Store component ~ Global) =>
