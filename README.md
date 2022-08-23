@@ -1,6 +1,6 @@
 # Hero
 
-Hero is an entity component system in Haskell and is inspired by [_apecs_](https://github.com/jonascarpay/apecs). Hero aims to be more performant than _apecs_ by using sparse sets as the main data structure for storing component data. In the future, it also aims to parallelize systems automatically as well.
+Hero is an entity component system in Haskell and is inspired by [_apecs_](https://github.com/jonascarpay/apecs). Hero aims to be more performant than _apecs_ by using sparse sets as the main data structure for storing component data. In the future, it also intends to parallelize systems automatically as well.
 
 ## Entities
 
