@@ -2,7 +2,6 @@ module Hero.Component.Store.Global where
 
 import Control.Arrow (Arrow (arr, (***)), (>>>))
 import Control.Monad.IO.Class (MonadIO (liftIO))
-import Data.Default (Default (def))
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Hero.Component.Capabilities
     ( ComponentPut(..), ComponentGet(..) )

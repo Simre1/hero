@@ -1,10 +1,10 @@
 # Hero
 
-Hero is an entity component system in Haskell and is inspired by [_apecs_](https://github.com/jonascarpay/apecs). Hero aims to be more performant than _apecs_ by using sparse sets as the main data structure for storing component data.
+Hero is an entity component system in Haskell and is inspired by [_apecs_](https://github.com/jonascarpay/apecs). Hero aims to be more performant than _apecs_ by using sparse sets as the main data structure for storing component data. In the future, it also aims to parallelize systems automatically as well.
 
-## World
+## Entities
 
-The `World` stores all entities and the component data. Components can be added to the world during runtime.
+Entities are objects which have components. You can create entities with the `createEntity` system and add components to them.
 
 ## Components
 
@@ -22,6 +22,14 @@ instance Component Position where
   -- StorableSparseSet is faster but Position would need to implement Storable
 ```
 
+## Stores
+
+Each component has a store which holds the component data. Depending on the use of the component, different stores might be best. 
+Most important stores are:
+- `BoxedSparseSet`: Can be used with any datatype. Each entity has its own component value.
+- `StorableSparseSet`: Can be used with `Storable` datatypes. Each entity has its own component value. Faster than `BoxedSparseSet`.
+- `Global`: Can be used with any datatype. Each entity has the same component value. Can also be accessed without an entity.
+
 ## Systems
 
 Systems are functions which operate on the components of a world. For example, you can map the `Position` component of every entity:
@@ -30,9 +38,9 @@ Systems are functions which operate on the components of a world. For example, y
 cmap_ $ \(Position x y) -> Position (x + 1) y
 ```
 
-`System`s have the type `system :: System m input output`. `System`s can be chained together through its `Applicative`, `Category` and `Arrow` instance. However, `System`s dot have an instance for `Monad`!
+`System`s have the type `system :: System m input output`. `System`s can be chained together through their `Applicative`, `Category` and `Arrow` instance. However, `System`s dot have an instance for `Monad`! If one is familiar with arrowized FRP, then they will feel that `System`s have a similar interface as signal functions.
 
-`System`s have a compilation phase and a run phase. Before you can run a `System`, you need to compile it with `compileSystem :: System m input output -> World -> IO (input -> m output)`.
+`System`s do not have a `Monad` instance since they are separated into a compilation and a run phase. Before you can run a `System`, you need to compile it with `compileSystem :: System m input output -> World -> IO (input -> m output)`. In the compilation phase, `System`s look up the used components so that run time is faster.
 
 ## Example
 
@@ -44,14 +52,11 @@ data Position = Position Int Int
 
 data Velocity = Velocity Int Int
 
-data Acceleration = Acceleration Int Int
-
 instance Component Position where
   type Store Position = BoxedSparseSet
 
 instance Component Velocity where
   type Store Velocity = BoxedSparseSet
-
 
 main :: IO ()
 main = do
@@ -102,6 +107,12 @@ To run the benchmarks, do:
 ```
 cabal run hero-bench
 cabal run apecs-bench
+```
+
+To generate **documentation**, do:
+```
+cabal haddock
+cabal haddock hero-sdl2
 ```
 
 ### Hero SDL2

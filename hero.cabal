@@ -27,7 +27,6 @@ library
         vector > 0.12,
         transformers,
         containers,
-        data-default,
         constraints,
         optics-core,
         linear

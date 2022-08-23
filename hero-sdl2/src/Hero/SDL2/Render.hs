@@ -84,10 +84,11 @@ data Fill = Fill
   }
   deriving (Generic)
 
-
+-- | Fill with color but no border
 fillColor :: V4 Word8 -> Fill
 fillColor c = Fill {color = Just c, border = Nothing}
 
+-- | Fill with border but no inner color
 fillBorder :: V4 Word8 -> Fill
 fillBorder c = Fill {color = Nothing, border = Just c}
 
@@ -103,7 +104,7 @@ data Sprite
   | Texture TextureSprite
   deriving (Generic)
 
--- A texture sprite defines a section of the texture which will be rendered
+-- | A texture sprite defines a section of the texture which will be rendered
 data TextureSprite = TextureSprite
   { size :: V2 Float,
     source :: Maybe (Rectangle Float),

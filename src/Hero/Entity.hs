@@ -18,7 +18,7 @@ import Data.Vector.Unboxed.Mutable qualified as VU
 import Data.Word (Word32)
 import Hero.SparseSet.NoComponent qualified as S
 
--- An entity is an object within a world with components. 'Entity' can be used to access the components of a world.
+-- | An entity is an object within a world with components. 'Entity' can be used to access the components of a world.
 -- Working the the underlying 'World32' is probably not a good idea.
 newtype Entity = Entity Word32 deriving (Show)
 

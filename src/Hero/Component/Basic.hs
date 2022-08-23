@@ -2,14 +2,14 @@ module Hero.Component.Basic where
 
 import Control.Arrow ((>>>))
 import Control.Monad.IO.Class (MonadIO (liftIO))
-import Data.Default (Default (def))
-import Data.IORef
+import Data.IORef ( atomicModifyIORef', newIORef, readIORef )
 import Foreign (Storable (..), castPtr, plusPtr)
-import GHC.Clock
+import GHC.Clock ( getMonotonicTime )
 import Hero.Component.Component (Component (..))
 import Hero.Component.Store.Global (Global, addGlobal, putGlobal)
 import Hero.Component.Store.SparseSet (StorableSparseSet, storableSparseSet)
-import Hero.System
+import Hero.System.System
+    ( forward, liftSystem, withSetup, System )
 import Hero.System.System (System)
 
 -- | Component for 2D positioning which uses sparse sets for storage
