@@ -30,9 +30,9 @@ newtype UnboxedSparseSet a = UnboxedSparseSet (SU.SparseSetUnboxed a)
 -- array) and the second should be the maximum amount of live entities for the component (size of the dense array).
 unboxedSparseSet' ::
   forall component m i.
-  (Unbox component, MonadIO m, Component component, Store component ~ UnboxedSparseSet) =>
+  (Unbox component, Component component, Store component ~ UnboxedSparseSet) =>
   SparseSetSize ->
-  System m i i
+  System i i
 unboxedSparseSet' (SparseSetSize dense) =
   withSetup
     (\w -> let i = (coerce $ w ^. #maxEntities) in UnboxedSparseSet <$> SU.create @component i dense)
@@ -42,8 +42,8 @@ unboxedSparseSet' (SparseSetSize dense) =
 -- decreasing the size.
 unboxedSparseSet ::
   forall component m i.
-  (Unbox component, MonadIO m, Component component, Store component ~ UnboxedSparseSet) =>
-  System m i i
+  (Unbox component, Component component, Store component ~ UnboxedSparseSet) =>
+  System i i
 unboxedSparseSet =
   withSetup
     (\w -> let i = (coerce $ w ^. #maxEntities) in UnboxedSparseSet <$> SU.create @component i i)
@@ -102,9 +102,9 @@ instance (Storable a) => ComponentIterate a StorableSparseSet where
 -- array) and the second should be the maximum amount of live entities for the component (size of the dense array).
 storableSparseSet' ::
   forall component m i.
-  (Storable component, MonadIO m, Component component, Store component ~ StorableSparseSet) =>
+  (Storable component, Component component, Store component ~ StorableSparseSet) =>
   SparseSetSize ->
-  System m i i
+  System i i
 storableSparseSet' (SparseSetSize dense) =
   withSetup
     (\w -> let i = (w ^. #maxEntities ^. coerced) in StorableSparseSet <$> SV.create @component i dense)
@@ -114,8 +114,8 @@ storableSparseSet' (SparseSetSize dense) =
 -- decreasing the size.
 storableSparseSet ::
   forall component m i.
-  (Storable component, MonadIO m, Component component, Store component ~ StorableSparseSet) =>
-  System m i i
+  (Storable component, Component component, Store component ~ StorableSparseSet) =>
+  System i i
 storableSparseSet =
   withSetup
     (\w -> let i = (w ^. #maxEntities ^. coerced) in StorableSparseSet <$> SV.create @component i i)
@@ -152,9 +152,9 @@ instance ComponentIterate a BoxedSparseSet where
 -- array) and the second should be the maximum amount of live entities for the component (size of the dense array).
 boxedSparseSet' ::
   forall component m i.
-  (MonadIO m, Component component, Store component ~ BoxedSparseSet) =>
+  (Component component, Store component ~ BoxedSparseSet) =>
   SparseSetSize ->
-  System m i i
+  System i i
 boxedSparseSet' (SparseSetSize dense) =
   withSetup
     (\w -> let i = (w ^. #maxEntities ^. coerced) in BoxedSparseSet <$> SB.create @component i dense)
@@ -164,8 +164,8 @@ boxedSparseSet' (SparseSetSize dense) =
 -- decreasing the size.
 boxedSparseSet ::
   forall component m i.
-  (MonadIO m, Component component, Store component ~ BoxedSparseSet) =>
-  System m i i
+  (Component component, Store component ~ BoxedSparseSet) =>
+  System i i
 boxedSparseSet =
   withSetup
     (\w -> let i = (w ^. #maxEntities ^. coerced) in BoxedSparseSet <$> SB.create @component i i)

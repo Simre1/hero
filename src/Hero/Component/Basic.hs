@@ -54,7 +54,7 @@ instance Component TimeDelta where
   type Store TimeDelta = Global
 
 -- | Sets up a `TimeDelta` and updates it.
-addTimeDelta :: MonadIO m => System m i i
+addTimeDelta :: System i i
 addTimeDelta =
   forward $
     addGlobal (TimeDelta 0)
@@ -74,7 +74,7 @@ instance Component Timer where
   type Store Timer = Global
 
 -- | Sets up a `Timer` and updates it.
-addTimer :: MonadIO m => System m i i
+addTimer :: System i i
 addTimer =
   forward $
     addGlobal (Timer 0)
@@ -88,5 +88,5 @@ addTimer =
       >>> putGlobal @Timer
 
 -- | Sets up a `Timer` and `TimeDelta` and updates them.
-addTimingComponents :: MonadIO m => System m i i
+addTimingComponents :: System i i
 addTimingComponents = addTimeDelta >>> addTimer

@@ -79,9 +79,9 @@ import Prelude hiding ((.))
 -- given function.
 cmap_ ::
   forall a b m i.
-  (QCI a, QCP b, MonadIO m) =>
+  (QCI a, QCP b) =>
   (a -> b) ->
-  System m i ()
+  System i ()
 cmap_ f =
   System
     ( \w -> do
@@ -95,9 +95,9 @@ cmap_ f =
 -- Has access to the system input.
 cmap ::
   forall a b i m.
-  (QCI a, QCP b, MonadIO m) =>
+  (QCI a, QCP b) =>
   (i -> a -> b) ->
-  System m i ()
+  System i ()
 cmap f =
   System
     ( \w -> do
@@ -108,7 +108,7 @@ cmap f =
 
 -- | Iterates over all entities with the requested components and sets the components calculated by the
 -- given monadic function
-cmapM_ :: forall a b i m. (QCI a, QCP b, MonadIO m) => (a -> m b) -> System m i ()
+cmapM_ :: forall a b i. (QCI a, QCP b) => (a -> IO b) -> System i ()
 cmapM_ f =
   System
     ( \w -> do
@@ -120,7 +120,7 @@ cmapM_ f =
 -- | Iterates over all entities with the requested components and sets the components calculated by the
 -- given monadic function.
 -- Has access to the system input.
-cmapM :: forall a b i m. (QCI a, QCP b, MonadIO m) => (i -> a -> m b) -> System m i ()
+cmapM :: forall a b i. (QCI a, QCP b) => (i -> a -> IO b) -> System i ()
 cmapM f =
   System
     ( \w -> do
@@ -130,7 +130,7 @@ cmapM f =
     )
 
 -- | Iterates over all entities with the requested components and folds the components.
-cfold_ :: forall a o m i. (Monoid o, QCI a, MonadIO m) => (a -> o) -> System m i o
+cfold_ :: forall a o i. (Monoid o, QCI a) => (a -> o) -> System i o
 cfold_ f = System $ \w -> do
   for <- queryFor @(S a) @a w
   members <- queryMembers @(S a) @a w
@@ -143,7 +143,7 @@ cfold_ f = System $ \w -> do
 
 -- | Iterates over all entities with the requested components and folds the components.
 -- Has access to the system input.
-cfold :: forall a o m i. (Monoid o, QCI a, MonadIO m) => (i -> a -> o) -> System m i o
+cfold :: forall a o i. (Monoid o, QCI a) => (i -> a -> o) -> System i o
 cfold f = System $ \w -> do
   for <- queryFor @(S a) @a w
   members <- queryMembers @(S a) @a w
@@ -155,7 +155,7 @@ cfold f = System $ \w -> do
     liftIO $ readIORef ref
 
 -- | Iterates over all entities with the requested components and monadically folds the components.
-cfoldM_ :: forall a o i m. (Monoid o, QCI a, MonadIO m) => (a -> m o) -> System m i o
+cfoldM_ :: forall a o i. (Monoid o, QCI a) => (a -> IO o) -> System i o
 cfoldM_ f = System $ \w -> do
   for <- queryFor @(S a) @a w
   pure $! \i2 -> do
@@ -167,7 +167,7 @@ cfoldM_ f = System $ \w -> do
 
 -- | Iterates over all entities with the requested components and monadically folds the components. 
 -- Has access to the system input.
-cfoldM :: forall a o i m. (Monoid o, QCI a, MonadIO m) => (i -> a -> m o) -> System m i o
+cfoldM :: forall a o i m. (Monoid o, QCI a) => (i -> a -> IO o) -> System i o
 cfoldM f = System $ \w -> do
   for <- queryFor @(S a) @a w
   pure $! \i -> do
@@ -180,14 +180,14 @@ cfoldM f = System $ \w -> do
 -- | Iterates over all entities with the requested components and folds the components.
 -- The order of getting the components, so there is no real difference between cfoldr and cfoldl.
 -- cfoldr is strict and early return is not possible.
-cfoldr :: (QCI a, MonadIO m) => (a -> b -> b) -> b -> System m () b
+cfoldr :: (QCI a) => (a -> b -> b) -> b -> System () b
 cfoldr f = cfoldl (flip f)
 {-# INLINE cfoldr #-}
 
 -- | Iterates over all entities with the requested components and folds the components.
 -- The order of getting the components, so there is no real difference between cfoldr and cfoldl.
 -- cfoldl is strict and early return is not possible.
-cfoldl :: forall a b m. (QCI a, MonadIO m) => (b -> a -> b) -> b -> System m () b
+cfoldl :: forall a b m. (QCI a) => (b -> a -> b) -> b -> System () b
 cfoldl f b = System $ \w -> do
   for <- queryFor @(S a) @a w
   pure $! \i2 -> do
@@ -198,21 +198,21 @@ cfoldl f b = System $ \w -> do
 {-# INLINE cfoldl #-}
 
 -- | Puts the component to the entity
-sput :: forall i m. (QCP i, MonadIO m) => System m (Entity, i) ()
+sput :: forall i m. (QCP i) => System (Entity, i) ()
 sput = System $ \w -> do
   put <- queryPut @(S i) w
   pure $ \(e, i) -> liftIO $ put e i
 {-# INLINE sput #-}
 
 -- | Deletes the component from the entity
-sdelete :: forall i m. (QCD i, MonadIO m) => System m Entity ()
+sdelete :: forall i m. (QCD i) => System Entity ()
 sdelete = System $ \w -> do
   delete <- queryDelete @(S i) @i w
   pure $ \e -> liftIO $ delete e
 {-# INLINE sdelete #-}
 
 -- | Creates a new entity with the given components
-createEntity :: forall a m. (QCP a, MonadIO m) => System m a Entity
+createEntity :: forall a m. (QCP a) => System a Entity
 createEntity = System $ \w -> do
   put <- queryPut @(S a) @a w
   pure $! \c -> do
@@ -222,7 +222,7 @@ createEntity = System $ \w -> do
 {-# INLINE createEntity #-}
 
 -- | Removes an entity and all its components
-deleteEntity :: forall a m. (MonadIO m) => System m Entity ()
+deleteEntity :: forall a m. (MonadIO m) => System Entity ()
 deleteEntity = System $ \w -> do
   let stores = w ^. #allStores
   let entities = w ^. #entities
@@ -232,7 +232,7 @@ deleteEntity = System $ \w -> do
 {-# INLINE deleteEntity #-}
 
 -- | Add a store to the world. Each store may only be set up once! Mostly used in combination with `withSetup`.
-addStore :: (Applicative m, Component component) => Store' component -> System m i i
+addStore :: (Component component) => Store' component -> System i i
 addStore store = System $ \w -> do
   World.addStore w store
   pure $ pure
@@ -243,7 +243,7 @@ addStore store = System $ \w -> do
 newtype Query m i o = Query (World.World -> IO (Entity -> i -> m o))
 
 -- | Execute a query on all matching entities
-runQuery :: forall i1 i2 o m. (QCI i1, Monoid o, MonadIO m) => Query m (i1, i2) o -> System m i2 o
+runQuery :: forall i1 i2 o. (QCI i1, Monoid o) => Query IO (i1, i2) o -> System i2 o
 runQuery (Query makeQ) = System $ \w -> do
   q <- makeQ w
   for <- queryFor @(S i1) @i1 w
@@ -256,7 +256,7 @@ runQuery (Query makeQ) = System $ \w -> do
 {-# INLINE runQuery #-}
 
 -- | Execute a query on all matching entities
-runQuery_ :: forall i o m. (QCI i, MonadIO m) => Query m i o -> System m () ()
+runQuery_ :: forall i o. (QCI i) => Query IO i o -> System () ()
 runQuery_ (Query makeQ) = System $ \w -> do
   q <- makeQ w
   for <- queryFor @(S i) @i w
@@ -265,7 +265,7 @@ runQuery_ (Query makeQ) = System $ \w -> do
 
 -- | Execute a query on the given entity. If the entity does not have the
 -- requested components, nothing is done.
-singleQuery_ :: forall i o m. (QCG i, MonadIO m) => Query m i o -> System m Entity (Maybe o)
+singleQuery_ :: forall i o. (QCG i) => Query IO i o -> System Entity (Maybe o)
 singleQuery_ (Query makeQ) = System $ \w -> do
   q <- makeQ w
   getValues <- queryGet @(S i) @i w
@@ -280,10 +280,10 @@ singleQuery_ (Query makeQ) = System $ \w -> do
 -- | Execute a query on the given entity. If the entity does not have the
 -- requested components, nothing is done.
 singleQuery ::
-  forall i1 i2 o m.
-  (QCG i1, MonadIO m) =>
-  Query m (i1, i2) o ->
-  System m (Entity, i2) (Maybe o)
+  forall i1 i2 o.
+  (QCG i1) =>
+  Query IO (i1, i2) o ->
+  System (Entity, i2) (Maybe o)
 singleQuery (Query makeQ) = System $ \w -> do
   q <- makeQ w
   getValues <- queryGet @(S i1) @i1 w
@@ -321,14 +321,14 @@ instance Monad m => Arrow (Query m) where
   {-# INLINE (***) #-}
 
 -- | Set a component of the matching entity
-qput :: forall i m. (QCP i, MonadIO m) => Query m i ()
+qput :: forall i m. (QCP i) => Query IO i ()
 qput = Query $ \w -> do
   put <- queryPut @(S i) @i w
   pure (fmap liftIO . put)
 {-# INLINE qput #-}
 
 -- | Delete the component of the matching entity
-qdelete :: forall i m. (QCD i, MonadIO m) => Query m i ()
+qdelete :: forall i m. (QCD i) => Query IO i ()
 qdelete = Query $ \w -> do
   delete <- queryDelete @(S i) @i w
   pure $! \e _ -> liftIO $ delete e
@@ -358,7 +358,7 @@ class QueryDelete (f :: Bool) components where
 
 -- | Iterate over components from the world
 class QueryGet f components => QueryIterate (f :: Bool) components where
-  queryFor :: MonadIO m => World.World -> IO ((Entity -> components -> m ()) -> m ())
+  queryFor :: World.World -> IO ((Entity -> components -> IO ()) -> IO ())
   queryMembers :: World.World -> IO (IO Int)
 
 -- | Machinery for getting components
