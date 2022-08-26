@@ -3,6 +3,7 @@ module Hero.Parallel.ExecutionPlanner where
 import Data.Graph qualified as G
 import Data.IntMap qualified as IM
 import GHC.Generics (Generic)
+import Data.Void
 
 data Resources a = Resources
   { read :: [a],
@@ -43,9 +44,19 @@ data Combine f a where
 --   MapOutput :: (b' -> b) -> ExecutionPlan r m a b' -> ExecutionPlan r m a b
 --   Forward :: ExecutionPlan r m a b -> ExecutionPlan r m a a
 
+data ExecutionPlan r a b where
+  Parallel :: ExecutionPlan r i (a -> b) -> ExecutionPlan r i a -> ExecutionPlan r i b
+  Sequence :: ExecutionPlan r a b -> ExecutionPlan r b c -> ExecutionPlan r a c
+  Action :: Resources r -> (a -> IO b) -> ExecutionPlan r a b
+  MainThread :: Resources r -> (a -> IO b) -> ExecutionPlan r a b
+  Map :: ExecutionPlan r a' b' -> ((a' -> IO b') -> a -> IO b) -> ExecutionPlan r a b
+  WithCompiled :: [ExecutionPlan r a' b'] -> ([a' -> IO b'] -> IO (ExecutionPlan r a b)) -> ExecutionPlan r a b
 
-data ExecutionPlanner r = ExecutionPlanner
+-- ionPlanner r = ExecutionPlanner
+--   { anyThread :: Unagi.InChan (IO a)
+--   }
 
-
+-- runParallal :: Combine IO a -> IO a
+-- runParallel
 
 -- data ScheduledTree f a = Parallel [Combine ScheduledTree a] | Sequence (Sequence f (ScheduledTree a)) | Single (ScheduledTree a)

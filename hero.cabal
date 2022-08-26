@@ -29,7 +29,8 @@ library
         containers,
         constraints,
         optics-core,
-        linear
+        linear,
+        unagi-chan
     hs-source-dirs:   src
     exposed-modules:
         Hero,

@@ -30,8 +30,7 @@ import Optics.Core ((^.))
 data World = World
   { allStores :: !AllStores.AllStores,
     entities :: !Entities,
-    maxEntities :: !MaxEntities,
-    executionPlanner :: ExecutionPlanner ComponentId
+    maxEntities :: !MaxEntities
   }
   deriving (Generic)
 

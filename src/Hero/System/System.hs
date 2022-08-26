@@ -5,28 +5,28 @@
 
 module Hero.System.System where
 
-import Control.Arrow (Arrow (arr, (***)))
+import Control.Arrow (Arrow (arr, (&&&), (***)))
 import Control.Category (Category (..))
 import Control.Monad.IO.Class (MonadIO (..))
+import Data.Coerce (coerce)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Kind (Type)
+import Data.Vector qualified as V
+import Hero.Component.Component (ComponentId)
+import Hero.Parallel.ExecutionPlanner
 import Hero.World (World)
 import Prelude hiding (id, (.))
-import qualified Data.Vector as V
-import Data.Coerce (coerce)
-
-
 
 -- | A system is a function which can operate on the components of a world.
 -- Keep in mind that system has Functor, Applicative, Category and Arrow instances, but no Monad instance.
-newtype System (i :: Type) (o :: Type) = System (World -> IO (i -> IO o))
+newtype System (i :: Type) (o :: Type) = System (World -> IO (ExecutionPlan ComponentId i o))
 
 instance Category System where
-  id = System (\_ -> pure (pure . id))
+  id = System (\_ -> pure (Action noResources (pure . id)))
   (System f1) . (System f2) = System $ \w -> do
     f2' <- f2 w
     f1' <- f1 w
-    pure $ \i -> f2' i >>= f1'
+    pure $ Sequence f2' f1'
   {-# INLINE id #-}
   {-# INLINE (.) #-}
 
@@ -72,13 +72,13 @@ withSetup f make = System $ \w -> do
 
 -- | Lifs a normal function into a System.
 liftSystem :: (a -> IO b) -> System a b
-liftSystem f = System $ \_ -> pure $ f
+liftSystem f = System $ \w -> pure $ \a -> Action noResources (f a)
 {-# INLINE liftSystem #-}
 
 -- | Compiles a system with the given World and returns a function which executes
 -- the operations within the System.
 compileSystem :: System i o -> World -> IO (i -> IO o)
-compileSystem (System f) w = f w
+compileSystem (System f) w = undefined
 {-# INLINE compileSystem #-}
 
 -- | Forwards the input of a system to its output. The previous output is ignored.
@@ -86,29 +86,32 @@ compileSystem (System f) w = f w
 forward :: System i o -> System i i
 forward (System makeS) = System $ \w -> do
   s <- makeS w
-  pure $ \i -> i <$ s i
+  pure $ Map s (\s' i -> i <$ s' i)
 {-# INLINE forward #-}
 
 -- | Executes a system only once and caches the output, then returns that output
 -- continously.
 once :: System i o -> System i o
 once (System makeS) = System $ \w -> do
-  s <- makeS w
-  ref <- newIORef (\_ -> pure undefined)
-  writeIORef ref $ \i -> s i >>= \o -> liftIO (writeIORef ref (\_ -> pure o)) >> pure o
-  pure $ \i -> liftIO (readIORef ref) >>= \f -> f i
+  s' <- makeS w
+  pure $
+    WithCompiled [s'] $ \[s] -> do
+      ref <- newIORef (\_ -> pure undefined)
+      writeIORef ref $ \i -> s i >>= \o -> liftIO (writeIORef ref (\_ -> pure o)) >> pure o
+      pure $ Action noResources $ \i -> liftIO (readIORef ref) >>= \f -> f i
 {-# INLINE once #-}
 
 -- | Feed back the output value as input in in the next iteration.
 feedback :: s -> System (i, s) (o, s) -> System i o
 feedback s (System makeS) = System $ \w -> do
-  runS <- makeS w
+  plan <- makeS w
   ref <- liftIO $ newIORef s
-  pure $ \i -> do
-    s' <- liftIO $ readIORef ref
-    (o, s'') <- runS (i, s')
-    liftIO $ writeIORef ref s''
-    pure o
+  pure $
+    Map plan $ \runS i -> do
+      s' <- liftIO $ readIORef ref
+      (o, s'') <- runS (i, s')
+      liftIO $ writeIORef ref s''
+      pure o
 {-# INLINE feedback #-}
 
 -- | Depending on the output of the last system, runs one or the other system, similar to the bool function.
@@ -116,24 +119,33 @@ feedback s (System makeS) = System $ \w -> do
 -- If output == True, then the second system is run (true -> right).
 -- Compiles all three systems.
 ifS :: System i o -> System i o -> System i Bool -> System i o
-ifS (System makeS1) (System makeS2) (System makeSD) = System $ \w -> do
+ifS (System makeS1) (System makeS2) decider = System $ \w -> do
+  let (System makeSD) = id &&& decider
   sd <- makeSD w
   s1 <- makeS1 w
   s2 <- makeS2 w
-  pure $ \i -> do
-    whichSystem <- sd i
-    if whichSystem
-      then s2 i
-      else s1 i
-  
+  pure $
+    Sequence sd $
+      WithCompiled [s1, s2] $ \[s1', s2'] -> pure $
+        Action noResources $ \(i, whichSystem) -> do
+          if whichSystem
+            then s2' i
+            else s1' i
+
 -- | Depending on the output of the last system, runs the system created by the given function.
 -- Runs the system which the function matches to the `enum`.
 -- Compiles systems for all `Enum` values. Do not use this for large `Enum`s!!
 ifEnum :: (Enum enum) => (enum -> System i o) -> System i enum -> System i o
-ifEnum makeSystem (System makeSD) = System $ \w -> do
+ifEnum makeSystem decider = System $ \w -> do
+  let (System makeSD) = id &&& decider
   sd <- makeSD w
-  compiledSystems <- fmap V.fromList $ sequenceA $ (($ w) . coerce . makeSystem) <$> enums
-  pure $ \i -> do
-    whichSystem <- sd i
-    (compiledSystems V.! (fromEnum whichSystem)) i
-  where enums = enumFrom (toEnum 0)
+
+  plans <- sequenceA $ (($ w) . coerce . makeSystem) <$> enums
+
+  pure $
+    Sequence sd $
+      WithCompiled plans $ \plans' -> do
+        let compiledSystems = V.fromList plans'
+        pure $ Action noResources $ \(i, whichSystem) -> (compiledSystems V.! (fromEnum whichSystem)) i
+  where
+    enums = enumFrom (toEnum 0)
