@@ -19,7 +19,7 @@ import Hero.World qualified as World
 newtype Global a = Global (IORef a)
 
 -- | Creates a global component store.
-addGlobal :: (Component a, Global ~ Store a) => MonadIO m => a -> System m i i
+addGlobal :: (Component a, Global ~ Store a) => a -> System i i
 addGlobal a = withSetup (\_ -> Global <$> newIORef a) addStore
 
 instance ComponentStore a Global where
@@ -38,18 +38,18 @@ instance ComponentPut a Global where
 
 -- Gets the value of a global component store
 getGlobal ::
-  forall component m i.
-  (MonadIO m, Component component, Store component ~ Global) =>
-  System m i component
+  forall component i.
+  (Component component, Store component ~ Global) =>
+  System i component
 getGlobal =
   withSetup' (World.getStore @component)
     >>> liftSystem (\(Global ref) -> liftIO $ readIORef ref)
 
 -- Puts the value into a global component store.
 putGlobal ::
-  forall component m.
-  (MonadIO m, Component component, Store component ~ Global) =>
-  System m component ()
+  forall component.
+  (Component component, Store component ~ Global) =>
+  System component ()
 putGlobal =
   arr (\a -> ((), a))
     >>> (withSetup' (World.getStore @component)) *** arr id

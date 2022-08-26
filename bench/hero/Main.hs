@@ -41,13 +41,13 @@ main = do
     [ bench "simple physics (3 components)" $ whnfIO $ run ()
     ]
 
-initEntities :: System IO () ()
+initEntities :: System () ()
 initEntities = for_
       [0 .. 1000]
       ( \i -> pure (Position 0 i, Velocity 0 0, Acceleration 1 0) >>> createEntity
       )
 
-physics :: System IO () ()
+physics :: System () ()
 physics = do
   for_ [1 .. 20] $ \_ -> do
     cmap_ $ \(Velocity vx vy, Acceleration ax ay) -> Velocity (vx + ax) (vy + ay)
