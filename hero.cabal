@@ -56,7 +56,9 @@ library
         Hero.System.System,
         Hero.System.ComponentFunctions,
 
-        Hero.Geometry
+        Hero.Geometry,
+
+        Hero.Parallel.ExecutionPlanner
 
 
     default-language: GHC2021

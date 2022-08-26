@@ -15,6 +15,8 @@ import Prelude hiding (id, (.))
 import qualified Data.Vector as V
 import Data.Coerce (coerce)
 
+
+
 -- | A system is a function which can operate on the components of a world.
 -- Keep in mind that system has Functor, Applicative, Category and Arrow instances, but no Monad instance.
 newtype System (m :: Type -> Type) (i :: Type) (o :: Type) = System (World -> IO (i -> m o))

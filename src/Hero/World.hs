@@ -22,13 +22,16 @@ import Hero.Entity
     entitiesNew,
     newEntities,
   )
+import Hero.Parallel.ExecutionPlanner
+
 import Optics.Core ((^.))
 
 -- | A world holds all entities and their components.
 data World = World
   { allStores :: !AllStores.AllStores,
     entities :: !Entities,
-    maxEntities :: !MaxEntities
+    maxEntities :: !MaxEntities,
+    executionPlanner :: ExecutionPlanner ComponentId
   }
   deriving (Generic)
 
