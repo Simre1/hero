@@ -2,6 +2,7 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Hero.System.System where
 
@@ -17,9 +18,12 @@ import Hero.Parallel.ExecutionPlanner
 import Hero.World (World)
 import Prelude hiding (id, (.))
 
+
+data Dependency = DependComponent ComponentId | DependEntity | DependAll
+
 -- | A system is a function which can operate on the components of a world.
 -- Keep in mind that system has Functor, Applicative, Category and Arrow instances, but no Monad instance.
-newtype System (i :: Type) (o :: Type) = System (World -> IO (ExecutionPlan ComponentId i o))
+newtype System (i :: Type) (o :: Type) = System (World -> IO (ExecutionPlan Dependency i o))
 
 instance Category System where
   id = System (\_ -> pure (Action noResources (pure . id)))
@@ -31,35 +35,35 @@ instance Category System where
   {-# INLINE (.) #-}
 
 instance Arrow System where
-  arr f = System (\_ -> pure (pure . f))
+  arr f = System (\_ -> pure (Action noResources $ pure . f))
   (System f1) *** (System f2) = System $ \w -> do
     f1' <- f1 w
     f2' <- f2 w
-    pure $ \(i1, i2) -> (,) <$> f1' i1 <*> f2' i2
+    pure $ Parallel (Map f1' $ \f1'' (i1,i2) -> (,) <$> f1'' i1) (Map f2' $ \f2'' (i1,i2) -> f2'' i2)
   {-# INLINE arr #-}
   {-# INLINE (***) #-}
 
 instance Functor (System i) where
   fmap f (System makeS) = System $ \w -> do
     s <- makeS w
-    pure $ \i -> fmap f (s i)
+    pure $ Map s $ \s' -> \i -> fmap f (s' i)
   {-# INLINE fmap #-}
 
 instance Applicative (System i) where
-  pure a = System $ \_ -> pure $ \_ -> pure a
+  pure a = System $ \_ -> pure $ Action noResources $ \_ -> pure a
 
   -- (<*>) might be automatically parallelized in the future. Use (>>>) for sequential code.
   (System makeSF) <*> (System makeSV) = System $ \w -> do
     f <- makeSF w
     v <- makeSV w
-    pure $ \i -> f i <*> v i
+    pure $ Parallel f v
   {-# INLINE pure #-}
   {-# INLINE (<*>) #-}
 
 -- | Allows code to be executed during the compilation stage.
 -- `IO a` is only executed once and the `a` is the permanent output of the system.
 withSetup' :: (World -> IO a) -> System i a
-withSetup' f = System $ \w -> f w >>= \a -> pure $ \_ -> pure a
+withSetup' f = System $ \w -> f w >>= \a -> pure $ Action noResources (\_ -> pure a)
 
 -- | Allows code to be executed during the compilation stage.
 -- `IO a` is only executed once and the `a` is the permanent output of the system.
@@ -72,14 +76,14 @@ withSetup f make = System $ \w -> do
 
 -- | Lifs a normal function into a System.
 liftSystem :: (a -> IO b) -> System a b
-liftSystem f = System $ \w -> pure $ \a -> Action noResources (f a)
+liftSystem f = System $ \w -> pure $ Action noResources f
 {-# INLINE liftSystem #-}
 
 -- | Compiles a system with the given World and returns a function which executes
 -- the operations within the System.
 compileSystem :: System i o -> World -> IO (i -> IO o)
-compileSystem (System f) w = undefined
-{-# INLINE compileSystem #-}
+compileSystem (System f) w = f w >>= compileExecutionPlan
+
 
 -- | Forwards the input of a system to its output. The previous output is ignored.
 -- Look at (&&&) if you do not want to ignore the output.

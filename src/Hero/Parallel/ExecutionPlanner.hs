@@ -1,9 +1,11 @@
+{-# LANGUAGE LambdaCase #-}
+
 module Hero.Parallel.ExecutionPlanner where
 
 import Data.Graph qualified as G
 import Data.IntMap qualified as IM
-import GHC.Generics (Generic)
 import Data.Void
+import GHC.Generics (Generic)
 
 data Resources a = Resources
   { read :: [a],
@@ -51,6 +53,27 @@ data ExecutionPlan r a b where
   MainThread :: Resources r -> (a -> IO b) -> ExecutionPlan r a b
   Map :: ExecutionPlan r a' b' -> ((a' -> IO b') -> a -> IO b) -> ExecutionPlan r a b
   WithCompiled :: [ExecutionPlan r a' b'] -> ([a' -> IO b'] -> IO (ExecutionPlan r a b)) -> ExecutionPlan r a b
+
+compileExecutionPlan :: ExecutionPlan r a b -> IO (a -> IO b)
+compileExecutionPlan = \case
+  Parallel p1 p2 -> do
+    p1' <- compileExecutionPlan p1
+    p2' <- compileExecutionPlan p2
+    pure $ \a -> p1' a <*> p2' a
+  Sequence p1 p2 -> do
+    p1' <- compileExecutionPlan p1
+    p2' <- compileExecutionPlan p2
+    pure $ \a -> p1' a >>= p2'
+  Action r a -> pure a
+  MainThread r a -> pure a
+  Map p f -> do
+    a <- compileExecutionPlan p
+    pure $ f a
+  WithCompiled plans f -> do
+    actions <- traverse compileExecutionPlan plans
+    plan <- f actions
+    compileExecutionPlan plan
+  where
 
 -- ionPlanner r = ExecutionPlanner
 --   { anyThread :: Unagi.InChan (IO a)
