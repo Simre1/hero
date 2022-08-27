@@ -78,8 +78,8 @@ import Hero.Component.Component
   )
 import Hero.Component.Store.AllStores qualified as AllStores
 import Hero.Entity (Entity, entitiesAmount, entitiesDelete, entitiesFor)
-import Hero.Parallel.ExecutionPlanner
-import Hero.System.System (Dependency (..), System (..))
+import Hero.System.ExecutionPlanner
+import Hero.System.System
 import Hero.World qualified as World
 import Optics.Core ((<&>), (^.))
 import Prelude hiding ((.))
@@ -96,9 +96,9 @@ cmap_ f =
     ( \w -> do
         for <- queryFor @(S a) @a w
         put <- queryPut @(S b) @b w
-        readDeps <- queryDependencies @(S a) @a w
-        writeDeps <- queryDependencies @(S b) @b w
-        pure $ Action (Resources readDeps writeDeps) $ \_ -> for $ \e a -> liftIO $ put e $! (f a)
+        readDeps <- queryResources @(S a) @a w
+        writeDeps <- queryResources @(S b) @b w
+        pure $ Action (makeDependencies readDeps writeDeps) $ \_ -> for $ \e a -> put e (f a)
     )
 
 -- | Iterates over all entities with the requested components and sets the components calculated by the
@@ -114,9 +114,9 @@ cmap f =
     ( \w -> do
         for <- queryFor @(S a) @a w
         put <- queryPut @(S b) @b w
-        readDeps <- queryDependencies @(S a) @a w
-        writeDeps <- queryDependencies @(S b) @b w
-        pure $ Action (Resources readDeps writeDeps) $ \i -> for $ \e a -> liftIO $ put e $! (f i a)
+        readDeps <- queryResources @(S a) @a w
+        writeDeps <- queryResources @(S b) @b w
+        pure $ Action (makeDependencies readDeps writeDeps) $ \i -> for $ \e a -> liftIO $ put e $! (f i a)
     )
 
 -- | Iterates over all entities with the requested components and sets the components calculated by the
@@ -127,9 +127,9 @@ cmapM_ f =
     ( \w -> do
         for <- queryFor @(S a) @a w
         put <- queryPut @(S b) @b w
-        readDeps <- queryDependencies @(S a) @a w
-        writeDeps <- queryDependencies @(S b) @b w
-        pure $ Action (Resources readDeps writeDeps) $ \_ -> for $ \e a -> f a >>= liftIO . put e
+        readDeps <- queryResources @(S a) @a w
+        writeDeps <- queryResources @(S b) @b w
+        pure $ Action (makeDependencies readDeps writeDeps) $ \_ -> for $ \e a -> f a >>= liftIO . put e
     )
 
 -- | Iterates over all entities with the requested components and sets the components calculated by the
@@ -141,9 +141,9 @@ cmapM f =
     ( \w -> do
         for <- queryFor @(S a) @a w
         put <- queryPut @(S b) @b w
-        readDeps <- queryDependencies @(S a) @a w
-        writeDeps <- queryDependencies @(S b) @b w
-        pure $ Action (Resources readDeps writeDeps) $ \i -> for (\e a -> f i a >>= liftIO . put e)
+        readDeps <- queryResources @(S a) @a w
+        writeDeps <- queryResources @(S b) @b w
+        pure $ Action (makeDependencies readDeps writeDeps) $ \i -> for (\e a -> f i a >>= liftIO . put e)
     )
 
 -- | Iterates over all entities with the requested components and folds the components.
@@ -151,8 +151,8 @@ cfold_ :: forall a o i. (Monoid o, QCI a, QCDep a) => (a -> o) -> System i o
 cfold_ f = System $ \w -> do
   for <- queryFor @(S a) @a w
   members <- queryMembers @(S a) @a w
-  readDeps <- queryDependencies @(S a) @a w
-  pure $! Action (Resources readDeps []) $ \i2 -> do
+  readDeps <- queryResources @(S a) @a w
+  pure $! Action (makeDependencies readDeps []) $ \i2 -> do
     ref <- liftIO $ newIORef (mempty :: o)
     for $! \e a -> do
       let o = f a
@@ -165,8 +165,8 @@ cfold :: forall a o i. (Monoid o, QCI a, QCDep a) => (i -> a -> o) -> System i o
 cfold f = System $ \w -> do
   for <- queryFor @(S a) @a w
   members <- queryMembers @(S a) @a w
-  readDeps <- queryDependencies @(S a) @a w
-  pure $! Action (Resources readDeps []) $ \i -> do
+  readDeps <- queryResources @(S a) @a w
+  pure $! Action (makeDependencies readDeps []) $ \i -> do
     ref <- liftIO $ newIORef (mempty :: o)
     for $! \e a -> do
       let o = f i a
@@ -177,8 +177,8 @@ cfold f = System $ \w -> do
 cfoldM_ :: forall a o i. (Monoid o, QCI a, QCDep a) => (a -> IO o) -> System i o
 cfoldM_ f = System $ \w -> do
   for <- queryFor @(S a) @a w
-  readDeps <- queryDependencies @(S a) @a w
-  pure $! Action (Resources readDeps []) $ \i2 -> do
+  readDeps <- queryResources @(S a) @a w
+  pure $! Action (makeDependencies readDeps []) $ \i2 -> do
     ref <- liftIO $ newIORef (mempty :: o)
     for $! \e a -> do
       o <- f a
@@ -190,8 +190,8 @@ cfoldM_ f = System $ \w -> do
 cfoldM :: forall a o i m. (Monoid o, QCI a, QCDep a) => (i -> a -> IO o) -> System i o
 cfoldM f = System $ \w -> do
   for <- queryFor @(S a) @a w
-  readDeps <- queryDependencies @(S a) @a w
-  pure $! Action (Resources readDeps []) $ \i -> do
+  readDeps <- queryResources @(S a) @a w
+  pure $! Action (makeDependencies readDeps []) $ \i -> do
     ref <- liftIO $ newIORef (mempty :: o)
     for $! \e a -> do
       o <- f i a
@@ -211,8 +211,8 @@ cfoldr f = cfoldl (flip f)
 cfoldl :: forall a b m. (QCI a, QCDep a) => (b -> a -> b) -> b -> System () b
 cfoldl f b = System $ \w -> do
   for <- queryFor @(S a) @a w
-  readDeps <- queryDependencies @(S a) @a w
-  pure $! Action (Resources readDeps []) $ \i2 -> do
+  readDeps <- queryResources @(S a) @a w
+  pure $! Action (makeDependencies readDeps []) $ \i2 -> do
     ref <- liftIO $ newIORef b
     for $! \e a -> do
       liftIO $ modifyIORef' ref $ \b -> f b a
@@ -223,24 +223,24 @@ cfoldl f b = System $ \w -> do
 sput :: forall i m. (QCP i, QCDep i) => System (Entity, i) ()
 sput = System $ \w -> do
   put <- queryPut @(S i) w
-  writeDeps <- queryDependencies @(S i) @i w
-  pure $ Action (Resources [] writeDeps) $ \(e, i) -> liftIO $ put e i
+  writeDeps <- queryResources @(S i) @i w
+  pure $ Action (makeDependencies [] writeDeps) $ \(e, i) -> liftIO $ put e i
 {-# INLINE sput #-}
 
 -- | Deletes the component from the entity
 sdelete :: forall i m. (QCD i, QCDep i) => System Entity ()
 sdelete = System $ \w -> do
   delete <- queryDelete @(S i) @i w
-  writeDeps <- queryDependencies @(S i) @i w
-  pure $ Action (Resources [] writeDeps) $ \e -> liftIO $ delete e
+  writeDeps <- queryResources @(S i) @i w
+  pure $ Action (makeDependencies [] writeDeps) $ \e -> liftIO $ delete e
 {-# INLINE sdelete #-}
 
 -- | Creates a new entity with the given components
 createEntity :: forall a m. (QCP a, QCDep a) => System a Entity
 createEntity = System $ \w -> do
   put <- queryPut @(S a) @a w
-  writeDeps <- queryDependencies @(S a) @a w
-  pure $! Action (Resources [] (DependEntity : writeDeps)) $ \c -> do
+  writeDeps <- queryResources @(S a) @a w
+  pure $! Action (makeDependencies [] (ResEntity : writeDeps)) $ \c -> do
     e <- liftIO $ World.createEntity w
     liftIO $ put e c
     pure e
@@ -251,7 +251,7 @@ deleteEntity :: forall a m. (MonadIO m) => System Entity ()
 deleteEntity = System $ \w -> do
   let stores = w ^. #allStores
   let entities = w ^. #entities
-  pure $! Action (Resources [] [DependAll]) $ \e -> liftIO $ do
+  pure $! Action (makeDependencies [] [ResAll]) $ \e -> liftIO $ do
     AllStores.eachStore stores $ \store -> componentEntityDelete store e
     entitiesDelete entities e
 {-# INLINE deleteEntity #-}
@@ -260,7 +260,7 @@ deleteEntity = System $ \w -> do
 addStore :: (Component component) => Store' component -> System i i
 addStore store = System $ \w -> do
   World.addStore w store
-  pure $ Action noResources pure
+  pure $ Action mempty pure
 
 -- | A Query is a function which can operate on the components of a world. In contrast to
 -- System, a query contains operations which operate on a single entity. System contains operations
@@ -387,8 +387,8 @@ class QueryGet f components => QueryIterate (f :: Bool) components where
   queryMembers :: World.World -> IO (IO Int)
 
 -- Get the component ids
-class QueryDependency f components where
-  queryDependencies :: World.World -> IO [Dependency]
+class QueryResources f components where
+  queryResources :: World.World -> IO [Resource]
 
 -- | Machinery for getting components
 type QCG (a :: *) = QueryGet (S a) a
@@ -403,7 +403,7 @@ type QCD (a :: *) = QueryDelete (S a) a
 type QCI (a :: *) = QueryIterate (S a) a
 
 -- | Machinery for getting component ids
-type QCDep (a :: *) = QueryDependency (S a) a
+type QCDep (a :: *) = QueryResources (S a) a
 
 instance QueryGet False () where
   queryContains w = pure $! \_ -> pure True
@@ -427,8 +427,8 @@ instance QueryIterate False () where
   {-# INLINE queryFor #-}
   {-# INLINE queryMembers #-}
 
-instance QueryDependency False () where
-  queryDependencies _ = pure $ [DependEntity]
+instance QueryResources False () where
+  queryResources _ = pure $ [ResEntity]
 
 instance QCG a => QueryGet False (Maybe a) where
   queryContains w = pure $! \_ -> pure True
@@ -466,8 +466,8 @@ instance QCG a => QueryIterate False (Maybe a) where
   {-# INLINE queryFor #-}
   {-# INLINE queryMembers #-}
 
-instance QCDep a => QueryDependency False (Maybe a) where
-  queryDependencies w = queryDependencies @(S a) @a w
+instance QCDep a => QueryResources False (Maybe a) where
+  queryResources w = queryResources @(S a) @a w
 
 instance QueryGet False Entity where
   queryContains w = pure $! \_ -> pure True
@@ -483,8 +483,8 @@ instance QueryIterate False Entity where
   {-# INLINE queryFor #-}
   {-# INLINE queryMembers #-}
 
-instance QueryDependency False Entity where
-  queryDependencies w = pure $ [DependEntity]
+instance QueryResources False Entity where
+  queryResources w = pure $ [ResEntity]
 
 instance (Component a, ComponentGet a (Store a)) => QueryGet True a where
   queryContains w = World.getStore @a w <&> \s !e -> componentContains s e
@@ -506,8 +506,8 @@ instance (Component a, ComponentIterate a (Store a)) => QueryIterate True a wher
   {-# INLINE queryFor #-}
   {-# INLINE queryMembers #-}
 
-instance Component a => QueryDependency True a where
-  queryDependencies w = pure . DependComponent <$> World.getComponentId @a w
+instance Component a => QueryResources True a where
+  queryResources w = pure . ResComponent <$> World.getComponentId @a w
 
 instance (QCG a, QCG b) => QueryGet False (a, b) where
   queryContains w = (\p1 p2 e -> (&&) <$!> p1 e <*> p2 e) <$!> queryContains @(S a) @a w <*> queryContains @(S b) @b w
@@ -560,8 +560,8 @@ instance (QCI a, QCI b) => QueryIterate False (a, b) where
   {-# INLINE queryFor #-}
   {-# INLINE queryMembers #-}
 
-instance (QCDep a, QCDep b) => QueryDependency False (a, b) where
-  queryDependencies w = (<>) <$> queryDependencies @(S a) @a w <*> queryDependencies @(S b) @b w
+instance (QCDep a, QCDep b) => QueryResources False (a, b) where
+  queryResources w = (<>) <$> queryResources @(S a) @a w <*> queryResources @(S b) @b w
 
 instance (QCG a, QCG b, QCG c) => QueryGet False (a, b, c) where
   queryContains w = do
@@ -657,11 +657,11 @@ instance (QCI a, QCI b, QCI c) => QueryIterate False (a, b, c) where
   {-# INLINE queryFor #-}
   {-# INLINE queryMembers #-}
 
-instance (QCDep a, QCDep b, QCDep c) => QueryDependency False (a, b, c) where
-  queryDependencies w =
+instance (QCDep a, QCDep b, QCDep c) => QueryResources False (a, b, c) where
+  queryResources w =
     fmap concat $
       sequenceA
-        [queryDependencies @(S a) @a w, queryDependencies @(S b) @b w, queryDependencies @(S c) @c w]
+        [queryResources @(S a) @a w, queryResources @(S b) @b w, queryResources @(S c) @c w]
 
 whenIO :: Monad m => m Bool -> m () -> m ()
 whenIO action f = do

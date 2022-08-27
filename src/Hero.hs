@@ -53,7 +53,6 @@ module Hero
     cfoldr,
     once,
     forward,
-    feedback,
     sdelete,
     sput,
     createEntity,

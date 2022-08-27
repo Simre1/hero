@@ -32,6 +32,8 @@ physics = do
   for_ [1 .. 20] $ \_ -> do
     cmap $ \(Velocity vx vy, Acceleration ax ay) -> Velocity (vx + ax) (vy + ay)
     cmap $ \(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy)
+    cmap $ \(Acceleration ax ay) -> Acceleration (succ ax) (succ ay)
+
     pure ()
 
   pure ()

@@ -22,7 +22,6 @@ import Hero.Entity
     entitiesNew,
     newEntities,
   )
-import Hero.Parallel.ExecutionPlanner
 
 import Optics.Core ((^.))
 

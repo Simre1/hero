@@ -44,13 +44,13 @@ physicsWorld = do
 
   make <- compileSystem createEntity world
   
-  forM_ [0..1000] $ \i ->
+  forM_ [0..8000] $ \i ->
     make (Position 0 i, Velocity 0 0, Acceleration 1 0)
   
   pure world
 
-physics :: System IO () ()
-physics = foldl (*>) sys $ const sys <$> [1..300]
+physics :: System () ()
+physics = foldl (*>) sys $ const sys <$> [1..500]
   where sys = 
           cmap_ (\(Velocity vx vy, Acceleration ax ay) -> Velocity (vx + ax) (vy + ay)) *>
           cmap_ (\(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy))

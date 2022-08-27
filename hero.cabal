@@ -30,7 +30,9 @@ library
         constraints,
         optics-core,
         linear,
-        unagi-chan
+        unagi-chan,
+        async,
+        async-pool
     hs-source-dirs:   src
     exposed-modules:
         Hero,
@@ -56,10 +58,10 @@ library
         Hero.System,
         Hero.System.System,
         Hero.System.ComponentFunctions,
+        Hero.System.ExecutionPlanner,
 
-        Hero.Geometry,
+        Hero.Geometry
 
-        Hero.Parallel.ExecutionPlanner
 
 
     default-language: GHC2021
@@ -69,7 +71,7 @@ library
         OverloadedLabels
         DuplicateRecordFields
         NoFieldSelectors
-    ghc-options: -O2
+    ghc-options: -O2 -threaded
 
 test-suite hero
     type: exitcode-stdio-1.0
@@ -77,20 +79,22 @@ test-suite hero
     build-depends:    base >4.13.0.0, hero, tasty, tasty-hunit, derive-storable, derive-storable-plugin
     hs-source-dirs:   test
     default-language: GHC2021
+    ghc-options: -O2 -threaded
+
 
 executable hero-bench
     main-is: Main.hs
     build-depends:    base >4.13.0.0, hero, tasty, tasty-bench, transformers, derive-storable, derive-storable-plugin
     hs-source-dirs:   bench/hero
     default-language: GHC2021
-    ghc-options: -O2
+    ghc-options: -O2 -threaded
 
 executable example
     main-is: Main.hs
     build-depends:    base >4.13.0.0, hero
     hs-source-dirs:   example
     default-language: GHC2021
-    ghc-options: -O2
+    ghc-options: -O2 -threaded
 
 
 executable apecs-bench
@@ -98,12 +102,14 @@ executable apecs-bench
     build-depends:    base >4.13.0.0, tasty, tasty-bench, apecs
     hs-source-dirs:   bench/apecs
     default-language: GHC2021
-    ghc-options: -O2
+    ghc-options: -O2 -threaded
+
 
 executable profile
     main-is: Main.hs
     build-depends:    base >4.13.0.0, hero, derive-storable, derive-storable-plugin
     hs-source-dirs:   profile
     default-language: GHC2021
-    ghc-options: -O2
+    ghc-options: -O2 -threaded
+
 
