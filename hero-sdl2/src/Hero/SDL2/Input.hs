@@ -283,7 +283,7 @@ import SDL.Input.Keyboard.Codes qualified as SDLCodes
 newtype KeyboardState = KeyboardState (SDLCodes.Scancode -> Bool)
 
 -- | Gets the current keyboard state. 
-getKeyboardState :: MonadIO m => System m i KeyboardState
+getKeyboardState :: System i KeyboardState
 getKeyboardState = liftSystem (const $ KeyboardState <$> SDL.getKeyboardState)
 
 -- | Checks if a key was pressed at the moment `KeyboardState` was sampled.
@@ -302,7 +302,7 @@ data KeyboardEvent = KeyboardEvent
 
 
 -- | Gets all keyboard events which happened since the last time the SDL events were pulled.
-getKeyboardEvents :: MonadIO m => System m () [KeyboardEvent]
+getKeyboardEvents :: System () [KeyboardEvent]
 getKeyboardEvents =
   getGlobal @SDLEvents
     >>> liftSystem
@@ -320,7 +320,7 @@ getKeyboardEvents =
 
 -- | Adds the `SDLEvents` store and updates it each frame. SDLEvents will contain the event that happened
 -- between the last frame and the current frame.
-addSDLEvents :: MonadIO m => System m () ()
+addSDLEvents :: System () ()
 addSDLEvents =
   withSetup (\_ -> SDL.initialize [SDL.InitEvents]) (\_ -> pure ())
     >>> addGlobal (SDLEvents [])

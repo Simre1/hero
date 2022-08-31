@@ -19,7 +19,7 @@ main = do
   runSystem <- compileSystem system world
   runSystem ()
 
-system :: System IO () ()
+system :: System () ()
 system =
   
   -- Create two entities

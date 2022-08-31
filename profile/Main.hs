@@ -49,7 +49,7 @@ physicsWorld = do
   
   pure world
 
-physics :: System IO () ()
+physics :: System () ()
 physics = foldl (*>) sys $ const sys <$> [1..300]
   where sys = 
           cmap_ (\(Velocity vx vy, Acceleration ax ay) -> Velocity (vx + ax) (vy + ay)) *>

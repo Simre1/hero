@@ -159,12 +159,12 @@ defaultCamera =
 
 -- | Initializes SDL2 graphics and runs the render functions after the given system.
 -- Use `runGraphics` to wrap your game logic systems to ensure that the render system runs after your game logic.
-runGraphics :: forall i o m. MonadIO m => GraphicsConfig -> System m i o -> System m i o
+runGraphics :: forall i o. GraphicsConfig -> System i o -> System i o
 runGraphics graphicsConfig system = setup >>> second system >>> first graphics >>> arr snd
   where
-    setup :: System m i (Graphics, i)
+    setup :: System i (Graphics, i)
     setup = withSetup (\_ -> createWindow graphicsConfig) (\graphics -> addGlobal graphics *> addGlobal defaultCamera *> pure graphics) &&& id
-    graphics :: System m Graphics ()
+    graphics :: System Graphics ()
     graphics =
       let render =
             (id &&& getGlobal @Camera)
@@ -231,6 +231,6 @@ renderEntities (Graphics renderer window, scale, adjustPosition) (maybePosition,
 
 -- | Loads a texture in the compilation step of a System and outputs it permanently. The Texture will stay alive for the whole
 -- program duration, so it is only suitable for small-scale applications.
-loadTexture :: MonadIO m => FilePath -> System m i SDL.Texture
+loadTexture :: FilePath -> System i SDL.Texture
 loadTexture filepath = getGlobal @Graphics >>> once (liftSystem $ \graphics -> Image.loadTexture (graphics ^. #renderer) filepath)
 {-# INLINE loadTexture #-}

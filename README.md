@@ -38,13 +38,15 @@ Systems are functions which operate on the components of a world. For example, y
 cmap_ $ \(Position x y) -> Position (x + 1) y
 ```
 
-`System`s have the type `system :: System m input output`. `System`s can be chained together through their `Applicative`, `Category` and `Arrow` instance. However, `System`s dot have an instance for `Monad`! If one is familiar with arrowized FRP, then they will feel that `System`s have a similar interface as signal functions.
+`System`s have the type `system :: System input output`. `System`s can be chained together through their `Applicative`, `Category` and `Arrow` instance. However, `System`s dot have an instance for `Monad`! If one is familiar with arrowized FRP, then they will feel that `System`s have a similar interface as signal functions.
 
-`System`s do not have a `Monad` instance since they are separated into a compilation and a run phase. Before you can run a `System`, you need to compile it with `compileSystem :: System m input output -> World -> IO (input -> m output)`. In the compilation phase, `System`s look up the used components so that run time is faster.
+`System`s do not have a `Monad` instance since they are separated into a compilation and a run phase. Before you can run a `System`, you need to compile it with `compileSystem :: System m input output -> World -> IO (input -> IO output)`. In the compilation phase, `System`s look up the used components so that run time is faster.
 
 ## Example
 
 ```haskell
+{-# LANGUAGE TypeFamilies #-}
+import Control.Monad ( forM_ )
 import Hero
 import Data.Foldable (for_)
 
@@ -60,21 +62,17 @@ instance Component Velocity where
 
 main :: IO ()
 main = do
-  -- Create the world with a maximum of 10000 live entities
   world <- createWorld 10000
-
-  -- Compile the system
   runSystem <- compileSystem system world
-
-  -- Run the system
   runSystem ()
 
-system :: System IO () ()
+system :: System () ()
 system =
+  
   -- Create two entities
   (pure (Position 0 0, Velocity 1 0) >>> createEntity) *>
   (pure (Position 10 0, Velocity 0 1) >>> createEntity) *>
-
+  
   -- Map position 10 times
   for_ [1..10] (\_ -> cmap_ (\(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy))) *>
 

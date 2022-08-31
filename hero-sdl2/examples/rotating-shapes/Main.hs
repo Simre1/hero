@@ -17,7 +17,7 @@ main = do
   forever $ do
     run ()
 
-system :: System IO () ()
+system :: System () ()
 system =
   runGraphics defaultGraphics $
     addTimingComponents >>> do
