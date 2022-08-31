@@ -1,6 +1,6 @@
 # Hero
 
-Hero is an entity component system in Haskell and is inspired by [_apecs_](https://github.com/jonascarpay/apecs). Hero aims to be more performant than _apecs_ by using sparse sets as the main data structure for storing component data. In the future, it also aims to parallelize systems automatically as well.
+Hero is an entity component system in Haskell and is inspired by [_apecs_](https://github.com/jonascarpay/apecs). Hero aims to be more performant than _apecs_ by using sparse sets as the main data structure for storing component data. In the future, it also intends to parallelize systems automatically as well.
 
 ## Entities
 
@@ -25,7 +25,7 @@ instance Component Position where
 ## Stores
 
 Each component has a store which holds the component data. Depending on the use of the component, different stores might be best. 
-Most important stores are:
+The most important stores are:
 - `BoxedSparseSet`: Can be used with any datatype. Each entity has its own component value.
 - `StorableSparseSet`: Can be used with `Storable` datatypes. Each entity has its own component value. Faster than `BoxedSparseSet`.
 - `Global`: Can be used with any datatype. Each entity has the same component value. Can also be accessed without an entity.
