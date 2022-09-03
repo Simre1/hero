@@ -182,7 +182,6 @@ cfoldM f = System $ \w -> do
 -- cfoldr is strict and early return is not possible.
 cfoldr :: (QCI a) => (a -> b -> b) -> b -> System () b
 cfoldr f = cfoldl (flip f)
-{-# INLINE cfoldr #-}
 
 -- | Iterates over all entities with the requested components and folds the components.
 -- The order of getting the components, so there is no real difference between cfoldr and cfoldl.
@@ -195,21 +194,18 @@ cfoldl f b = System $ \w -> do
     for $! \e a -> do
       liftIO $ modifyIORef' ref $ \b -> f b a
     liftIO $ readIORef ref
-{-# INLINE cfoldl #-}
 
 -- | Puts the component to the entity
 sput :: forall i m. (QCP i) => System (Entity, i) ()
 sput = System $ \w -> do
   put <- queryPut @(S i) w
   pure $ \(e, i) -> liftIO $ put e i
-{-# INLINE sput #-}
 
 -- | Deletes the component from the entity
 sdelete :: forall i m. (QCD i) => System Entity ()
 sdelete = System $ \w -> do
   delete <- queryDelete @(S i) @i w
   pure $ \e -> liftIO $ delete e
-{-# INLINE sdelete #-}
 
 -- | Creates a new entity with the given components
 createEntity :: forall a m. (QCP a) => System a Entity
@@ -219,7 +215,6 @@ createEntity = System $ \w -> do
     e <- liftIO $ World.createEntity w
     liftIO $ put e c
     pure e
-{-# INLINE createEntity #-}
 
 -- | Removes an entity and all its components
 deleteEntity :: forall a m. (MonadIO m) => System Entity ()

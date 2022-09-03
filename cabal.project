@@ -1,1 +1,15 @@
 packages: *.cabal, hero-sdl2/hero-sdl2.cabal
+
+
+
+
+source-repository-package
+   type: git
+   location: https://github.com/Simre1/sparse-set
+
+
+-- source-repository-package
+--    type: git
+--    location: https://github.com/dpwiz/apecs.git
+--    subdir: apecs
+--    tag: ba66f7bfaa24d74523ecbdfda4183f2ca7d4d250

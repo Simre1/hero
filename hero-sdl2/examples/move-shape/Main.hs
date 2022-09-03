@@ -24,7 +24,8 @@ system =
   runGraphics defaultGraphics $
     addSDLEvents >>> addTimingComponents >>> do
       once
-        ( pure (Position2D 0 0, sprite) >>> createEntity
+        ( pure (Position2D 0 0, sprite) >>> createEntity *>
+          pure (Position2D 100 0, sprite) >>> createEntity
         )
       getGlobal @TimeDelta &&& getKeyboardState
         >>> cmap

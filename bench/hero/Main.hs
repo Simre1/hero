@@ -49,7 +49,7 @@ initEntities = for_
 
 physics :: System () ()
 physics = do
-  for_ [1 .. 20] $ \_ -> do
+  for_ [0 .. 999] $ \_ -> do
     cmap_ $ \(Velocity vx vy, Acceleration ax ay) -> Velocity (vx + ax) (vy + ay)
     cmap_ $ \(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy)
     pure ()

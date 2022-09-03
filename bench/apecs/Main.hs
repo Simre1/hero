@@ -1,18 +1,37 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
+
+{-# OPTIONS_GHC -fplugin=Foreign.Storable.Generic.Plugin #-}
 
 import Apecs
 import Control.Monad
 import Data.Foldable (for_)
+import Foreign.Storable.Generic (GStorable)
+import GHC.Generics (Generic)
 import Test.Tasty.Bench
 
-data Position = Position {-# UNPACK #-} !Int {-# UNPACK #-} !Int
+import Apecs.Stores (StorableSparseSet)
+import Data.Bits (shiftL, shiftR, (.&.))
 
-data Velocity = Velocity {-# UNPACK #-} !Int {-# UNPACK #-} !Int
+data Position = Position {-# UNPACK #-} !Int {-# UNPACK #-} !Int deriving (Generic)
+data Velocity = Velocity {-# UNPACK #-} !Int {-# UNPACK #-} !Int deriving (Generic)
+data Acceleration = Acceleration {-# UNPACK #-} !Int {-# UNPACK #-} !Int deriving (Generic)
 
-data Acceleration = Acceleration {-# UNPACK #-} !Int {-# UNPACK #-} !Int
+instance GStorable Position
+instance GStorable Velocity
+instance GStorable Acceleration
 
-makeWorldAndComponents "World" [''Position, ''Velocity, ''Acceleration]
+instance Component Position where
+  type Storage Position = StorableSparseSet Position
+
+instance Component Velocity where
+  type Storage Velocity = StorableSparseSet Velocity
+
+instance Component Acceleration where
+  type Storage Acceleration = StorableSparseSet Acceleration
+
+makeWorld "World" [''Position, ''Velocity, ''Acceleration]
 
 main :: IO ()
 main = do
@@ -29,7 +48,7 @@ initEntities = for_ [0 .. 1000] $ \i ->
 
 physics :: System World ()
 physics = do
-  for_ [1 .. 20] $ \_ -> do
+  for_ [0 .. 999] $ \_ -> do
     cmap $ \(Velocity vx vy, Acceleration ax ay) -> Velocity (vx + ax) (vy + ay)
     cmap $ \(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy)
     pure ()

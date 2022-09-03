@@ -11,7 +11,7 @@ import Data.Traversable (for)
 import Foreign.Storable.Generic (GStorable)
 import GHC.Generics
 import Hero
-import Hero.SparseSet.Storable qualified as S
+import SparseSet.Storable qualified as S
 import Test.Tasty
 import Test.Tasty.HUnit (testCase, (@?))
 

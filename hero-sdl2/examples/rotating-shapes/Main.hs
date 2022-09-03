@@ -29,7 +29,7 @@ system =
           ( \(Timer t) (render :: Render) ->
               let t' = realToFrac t in
               render
-                & #offset .~ (V2 (100 * cos (t' * pi)) (100 * sin (t' * pi)))
+                & #offset .~ (V2 (100 * cos (t' * pi)) (100 * sin (t' * pi))) 
                 & #rotation .~ (t' * pi)
           )
       pure ()

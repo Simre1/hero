@@ -13,9 +13,9 @@ import Hero.Entity
   ( Entity (Entity),
     MaxEntities (MaxEntities),
   )
-import Hero.SparseSet.Boxed qualified as SB
-import Hero.SparseSet.Storable qualified as SV
-import Hero.SparseSet.Unboxed qualified as SU
+import SparseSet.Boxed qualified as SB
+import SparseSet.Storable qualified as SV
+import SparseSet.Unboxed qualified as SU
 import Hero.System (System, withSetup)
 import Hero.System.ComponentFunctions (addStore)
 import Hero.World as World hiding (addStore)

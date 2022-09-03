@@ -50,7 +50,7 @@ physicsWorld = do
   pure world
 
 physics :: System () ()
-physics = foldl (*>) sys $ const sys <$> [1..300]
+physics = foldl (*>) sys $ const sys <$> [1..1000]
   where sys = 
           cmap_ (\(Velocity vx vy, Acceleration ax ay) -> Velocity (vx + ax) (vy + ay)) *>
           cmap_ (\(Position x y, Velocity vx vy) -> Position (x + vx) (y + vy))
